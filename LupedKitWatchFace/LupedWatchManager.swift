@@ -82,7 +82,15 @@ public final class LupedWatchManager: WatchManager {
         }
         transportIfStarted = transport
         transport.start()
+        if !Self.hasBluetoothPeripheralBackgroundMode() {
+            logDeviceCommunication("Loop was built without the bluetooth-peripheral background mode (LOOP_BLUETOOTH_PERIPHERAL_BACKGROUND_MODE = NO): the watch only updates while Loop is in the foreground", kind: .error)
+        }
         return transport
+    }
+
+    /// Whether the app may keep the watch's Bluetooth service running in the background.
+    static func hasBluetoothPeripheralBackgroundMode(in bundle: Bundle = .main) -> Bool {
+        (bundle.object(forInfoDictionaryKey: "UIBackgroundModes") as? [String])?.contains("bluetooth-peripheral") == true
     }
 
     @MainActor

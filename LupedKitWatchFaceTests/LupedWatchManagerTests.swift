@@ -49,6 +49,12 @@ final class LupedWatchManagerTests: XCTestCase {
         manager.watchManagerDelegate = delegate
         _ = manager.transport
 
+        // The test runner has no background modes, so starting the link warns once.
+        XCTAssertFalse(LupedWatchManager.hasBluetoothPeripheralBackgroundMode())
+        XCTAssertEqual(delegate.logEntries.map(\.type), [.error])
+        XCTAssertTrue(delegate.logEntries.first?.message.contains("bluetooth-peripheral") == true)
+        delegate.logEntries.removeAll()
+
         // A settings change is recorded by LupedTransport itself.
         manager.settings.alarmsEnabled = false
         for _ in 0..<50 where delegate.logEntries.isEmpty {
