@@ -135,6 +135,7 @@ private final class MockWatchManagerDelegate: WatchManagerDelegate {
     func watchManagerWantsDeletion(_ manager: WatchManager) async { deletions += 1 }
     func watchManager(_ manager: WatchManager, glucoseSamplesSince start: Date) async throws -> [StoredGlucoseSample] { [] }
     func watchManagerRequestsRefresh(_ manager: WatchManager) {}
+    func watchManager(_ manager: WatchManager, requestBolus request: WatchBolusRequest) async throws -> Double { throw WatchBolusError.notAllowed }
 
     func issueAlert(_ alert: Alert) async {}
     func retractAlert(identifier: Alert.Identifier) async {}
