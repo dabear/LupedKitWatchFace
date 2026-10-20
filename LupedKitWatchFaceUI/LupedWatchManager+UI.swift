@@ -20,11 +20,12 @@ extension LupedWatchManager: WatchManagerUI {
         UIImage(systemName: "watch.analog")
     }
 
-    /// Adding the watch needs no setup: the Pebble app pairs the watch, and the
-    /// watchface finds the phone once Loop publishes the Bluetooth service.
+    /// The Pebble app pairs the watch, and the watchface finds Loop once Loop
+    /// publishes the Bluetooth service, so setup only explains what is needed,
+    /// adds the watch, and confirms that a reading reached it.
     @MainActor
     public static func setupViewController(bluetoothProvider: BluetoothProvider, displayGlucosePreference: DisplayGlucosePreference, colorPalette: LoopUIColorPalette, allowDebugFeatures: Bool) -> SetupUIResult<WatchManagerViewController, WatchManagerUI> {
-        .createdAndOnboarded(LupedWatchManager())
+        .userInteractionRequired(LupedSetupNavigationController())
     }
 
     @MainActor

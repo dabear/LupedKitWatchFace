@@ -49,7 +49,7 @@ public final class LupedWatchManager: WatchManager {
 
     @MainActor var latestSnapshot: WatchStatusSnapshot?
     @MainActor var latestAlertState: WatchGlucoseAlertState?
-    @MainActor private var transportIfStarted: LupedTransport?
+    @MainActor var transportIfStarted: LupedTransport?
 
     public init(settings: LupedSettings = LupedSettings(isEnabled: true)) {
         lockedSettings = Locked(settings)
@@ -89,7 +89,7 @@ public final class LupedWatchManager: WatchManager {
     }
 
     /// Whether the app may keep the watch's Bluetooth service running in the background.
-    static func hasBluetoothPeripheralBackgroundMode(in bundle: Bundle = .main) -> Bool {
+    public static func hasBluetoothPeripheralBackgroundMode(in bundle: Bundle = .main) -> Bool {
         (bundle.object(forInfoDictionaryKey: "UIBackgroundModes") as? [String])?.contains("bluetooth-peripheral") == true
     }
 

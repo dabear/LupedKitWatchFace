@@ -57,5 +57,18 @@ xcodebuild test -workspace LoopWorkspace.xcworkspace -scheme LupedKitWatchFace \
   -destination 'platform=iOS Simulator,name=iPhone 18 Pro'
 ```
 
-In Loop, add the watch under Settings → Devices → Add Watch → Pebble. The
-Pebble must be paired with the Pebble app and running the Luped watchface.
+## Adding the watch
+
+The Pebble app already pairs the watch, so there is nothing to pair in Loop. In
+Loop, open Settings → Devices → Add Watch → Pebble:
+
+1. **Before you start**: pair the Pebble in the Pebble app, install
+   [Luped CGM](https://apps.repebble.com/luped-cgm_d47105a3c7c1489895b067ff),
+   and make it the active watchface. Cancel here adds nothing.
+2. **Add Pebble**: Loop publishes its Bluetooth service and shows live progress:
+   waiting for the watch, connected, and finally the time of the reading the
+   watch acknowledged. If Luped isn't the running watchface, the screen says
+   so and offers Send Now and the store link.
+3. **Done**: closes the screen at any point. Loop keeps connecting in the
+   background; Settings → Devices → Pebble shows the same status, and Delete
+   Pebble there removes the watch and stops the Bluetooth service.

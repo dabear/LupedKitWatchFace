@@ -73,6 +73,22 @@ final class LupedWatchManagerTests: XCTestCase {
         XCTAssertEqual(delegate.logEntries.map(\.type), [.send, .receive, .error, .connection])
     }
 
+    /// Delete from the settings screen asks the host to remove the manager and
+    /// switches the Bluetooth link off.
+    func testDeleteRemovesTheManagerAndStopsTheLink() async {
+        let manager = LupedWatchManager(settings: LupedSettings(isEnabled: true))
+        let delegate = MockWatchManagerDelegate()
+        manager.watchManagerDelegate = delegate
+        manager.transportIfStarted = LupedTransport(hostName: "Loop", settings: manager.settings)
+
+        let deleted = expectation(description: "delete completes")
+        manager.delete { deleted.fulfill() }
+        await fulfillment(of: [deleted], timeout: 2)
+
+        XCTAssertEqual(delegate.deletions, 1)
+        XCTAssertEqual(manager.transportIfStarted?.settings.isEnabled, false)
+    }
+
     func testSnapshotBecomesLupedSnapshot() throws {
         let manager = LupedWatchManager(settings: LupedSettings(isEnabled: false))
         XCTAssertNil(manager.lupedSnapshot(), "Nothing to send before the first snapshot")
@@ -109,13 +125,14 @@ private final class MockWatchManagerDelegate: WatchManagerDelegate {
 
     var logEntries: [LogEntry] = []
     var stateUpdates = 0
+    var deletions = 0
 
     func deviceManager(_ manager: DeviceManager, logEventForDeviceIdentifier deviceIdentifier: String?, type: DeviceLogEntryType, message: String, completion: ((Error?) -> Void)?) {
         logEntries.append(LogEntry(deviceIdentifier: deviceIdentifier, type: type, message: message))
     }
 
     func watchManagerDidUpdateState(_ manager: WatchManager) { stateUpdates += 1 }
-    func watchManagerWantsDeletion(_ manager: WatchManager) async {}
+    func watchManagerWantsDeletion(_ manager: WatchManager) async { deletions += 1 }
     func watchManager(_ manager: WatchManager, glucoseSamplesSince start: Date) async throws -> [StoredGlucoseSample] { [] }
     func watchManagerRequestsRefresh(_ manager: WatchManager) {}
 
@@ -125,4 +142,42 @@ private final class MockWatchManagerDelegate: WatchManagerDelegate {
     func lookupAllUnretracted(managerIdentifier: String) async throws -> [PersistedAlert] { [] }
     func lookupAllUnacknowledgedUnretracted(managerIdentifier: String) async throws -> [PersistedAlert] { [] }
     func recordRetractedAlert(_ alert: Alert, at date: Date) async throws {}
+}
+
+final class LupedSetupProgressTests: XCTestCase {
+    private let reading = Date(timeIntervalSince1970: 1_800_000_000)
+
+    private func progress(_ link: LupedLinkStatus.Link, delivered: Date? = nil, rejected: Date? = nil, paused: Bool = false) -> LupedSetupProgress {
+        LupedSetupProgress(link: link, lastDelivery: delivered.map { (reading, $0) }, lastRejectedAt: rejected, paused: paused)
+    }
+
+    func testLinkStatesBeforeAnyReading() {
+        XCTAssertEqual(progress(.off), .waitingForWatch)
+        XCTAssertEqual(progress(.waitingForWatch), .waitingForWatch)
+        XCTAssertEqual(progress(.connecting), .connecting)
+        XCTAssertEqual(progress(.bluetoothUnavailable), .bluetoothUnavailable)
+    }
+
+    func testConnectedIsNotDoneUntilTheWatchAcknowledgesAReading() {
+        XCTAssertEqual(progress(.open), .waitingForReading)
+        XCTAssertFalse(progress(.open).isComplete)
+        XCTAssertEqual(progress(.open, delivered: reading.addingTimeInterval(5)), .delivered(readingDate: reading))
+        XCTAssertTrue(progress(.open, delivered: reading.addingTimeInterval(5)).isComplete)
+    }
+
+    func testRejectedOrPausedMeansTheWatchfaceIsNotRunning() {
+        XCTAssertEqual(progress(.open, rejected: reading), .watchfaceNotRunning)
+        XCTAssertEqual(progress(.open, paused: true), .watchfaceNotRunning)
+    }
+
+    func testTheNewestOfDeliveryAndRejectionWins() {
+        let early = reading.addingTimeInterval(10)
+        let late = reading.addingTimeInterval(20)
+        XCTAssertEqual(progress(.open, delivered: late, rejected: early), .delivered(readingDate: reading))
+        XCTAssertEqual(progress(.open, delivered: early, rejected: late), .watchfaceNotRunning)
+    }
+
+    func testADeliveredReadingStaysDoneAfterTheLinkDrops() {
+        XCTAssertEqual(progress(.waitingForWatch, delivered: reading), .delivered(readingDate: reading))
+    }
 }
