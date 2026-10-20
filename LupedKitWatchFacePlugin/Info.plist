@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CFBundleDevelopmentRegion</key>
+	<string>$(DEVELOPMENT_LANGUAGE)</string>
+	<key>CFBundleExecutable</key>
+	<string>$(EXECUTABLE_NAME)</string>
+	<key>CFBundleIdentifier</key>
+	<string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
+	<key>CFBundleInfoDictionaryVersion</key>
+	<string>6.0</string>
+	<key>CFBundleName</key>
+	<string>$(PRODUCT_NAME)</string>
+	<key>CFBundlePackageType</key>
+	<string>$(PRODUCT_BUNDLE_PACKAGE_TYPE)</string>
+	<key>CFBundleShortVersionString</key>
+	<string>1.0</string>
+	<key>CFBundleVersion</key>
+	<string>1</string>
+	<key>NSPrincipalClass</key>
+	<string>LupedKitWatchFacePlugin</string>
+	<key>com.loopkit.Loop.WatchManagerDisplayName</key>
+	<string>Pebble (Luped CGM watchface)</string>
+	<key>com.loopkit.Loop.WatchManagerIdentifier</key>
+	<string>LupedWatchManager</string>
+	<key>com.loopkit.Loop.DeviceManufacturer</key>
+	<string>Core Devices</string>
+	<key>com.loopkit.Loop.PluginSubtitle</key>
+	<string>Pebble 2 Duo, Pebble Time 2, Pebble Round 2, and older Pebbles</string>
+</dict>
+</plist>

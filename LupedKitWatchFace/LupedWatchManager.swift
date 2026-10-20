@@ -1,0 +1,206 @@
+//
+//  LupedWatchManager.swift
+//  LupedKitWatchFace
+//
+//  Copyright © 2026 LoopKit Authors. All rights reserved.
+//
+
+@_exported import LupedKit
+import Foundation
+import LoopAlgorithm
+import LoopKit
+
+/// Shows Loop's glucose on a Pebble running the Luped watchface, over
+/// LupedKit's direct Bluetooth link.
+///
+/// Loop sends a snapshot as soon as a new reading is stored; it is forwarded
+/// to the watch right away. The watch alarms on its own using Loop's glucose
+/// alert settings, so it also receives Loop's alert state and mute.
+public final class LupedWatchManager: WatchManager {
+    public static let pluginIdentifier = "LupedWatchManager"
+    public static let localizedTitle = LocalizedString("Pebble", comment: "Title of the Luped Pebble watch manager")
+
+    public static var capabilities: WatchCapabilities { [.glucose, .history, .alerts] }
+
+    public var pluginIdentifier: String { Self.pluginIdentifier }
+    public var localizedTitle: String { Self.localizedTitle }
+
+    public weak var watchManagerDelegate: WatchManagerDelegate?
+
+    public var delegateQueue: DispatchQueue! {
+        get { lockedDelegateQueue.value }
+        set { lockedDelegateQueue.value = newValue ?? .main }
+    }
+    private let lockedDelegateQueue = Locked<DispatchQueue>(.main)
+
+    /// Luped's settings, saved in `rawState`. Changes apply to the watch link.
+    public var settings: LupedSettings {
+        get { lockedSettings.value }
+        set {
+            guard newValue != lockedSettings.value else { return }
+            lockedSettings.value = newValue
+            Task { @MainActor in
+                self.transportIfStarted?.settings = newValue
+            }
+            watchManagerDelegate?.watchManagerDidUpdateState(self)
+        }
+    }
+    private let lockedSettings: Locked<LupedSettings>
+
+    @MainActor var latestSnapshot: WatchStatusSnapshot?
+    @MainActor var latestAlertState: WatchGlucoseAlertState?
+    @MainActor private var transportIfStarted: LupedTransport?
+
+    public init(settings: LupedSettings = LupedSettings(isEnabled: true)) {
+        lockedSettings = Locked(settings)
+    }
+
+    public init?(rawState: RawStateValue) {
+        lockedSettings = Locked(LupedSettings(rawValue: rawState["settings"] as? LupedSettings.RawValue ?? [:]))
+    }
+
+    public var rawState: RawStateValue {
+        ["settings": settings.rawValue]
+    }
+
+    public var isOnboarded: Bool { true }
+    public var inSignalLoss: Bool { false }
+    public var isInoperable: Bool { false }
+
+    /// The watch link, started on first use.
+    @MainActor
+    public var transport: LupedTransport {
+        if let transportIfStarted {
+            return transportIfStarted
+        }
+        let transport = LupedTransport(hostName: "Loop", settings: settings)
+        transport.diagnosticLog = { [weak self] kind, message in
+            self?.logDeviceCommunication(message, kind: kind)
+        }
+        transport.snapshotProvider = { [weak self] in
+            await self?.lupedSnapshot()
+        }
+        transportIfStarted = transport
+        transport.start()
+        return transport
+    }
+
+    @MainActor
+    public func watchDataDidUpdate(_ snapshot: WatchStatusSnapshot) {
+        latestSnapshot = snapshot
+        Task { await transport.refresh() }
+    }
+
+    @MainActor
+    public func glucoseAlertStateDidUpdate(_ state: WatchGlucoseAlertState) {
+        latestAlertState = state
+        // The first snapshot sends the alert state with it.
+        if latestSnapshot != nil {
+            Task { await transport.refresh() }
+        }
+    }
+
+    public func delete(completion: @escaping () -> Void) {
+        Task { @MainActor in
+            // Removes the Bluetooth service and stops retries.
+            transportIfStarted?.settings.isEnabled = false
+            notifyDelegateOfDeletion(completion: completion)
+        }
+    }
+
+    @MainActor
+    func lupedSnapshot() -> LupedSnapshot? {
+        guard let snapshot = latestSnapshot else {
+            return nil
+        }
+        let start = Date(timeIntervalSinceNow: -LupedPayload.historyInterval)
+        let samples = snapshot.glucoseHistory.filter { $0.startDate >= start }
+        let readings = samples
+            .filter { !$0.wasUserEntered && !$0.isDisplayOnly }
+            .map { sample in
+                LupedReading(
+                    date: sample.startDate,
+                    milligramsPerDeciliter: sample.quantity.doubleValue(for: .milligramsPerDeciliter),
+                    trend: sample.trend.map(LupedTrend.init)
+                )
+            }
+        return LupedSnapshot(
+            readings: readings,
+            storedSampleCount: samples.count,
+            unit: snapshot.displayUnit == .millimolesPerLiter ? .millimolesPerLiter : .milligramsPerDeciliter,
+            alerts: LupedAlertState(latestAlertState)
+        )
+    }
+
+    func logDeviceCommunication(_ message: String, kind: LupedCommunicationLog.Kind) {
+        let type: DeviceLogEntryType
+        switch kind {
+        case .toWatch: type = .send
+        case .fromWatch: type = .receive
+        case .error: type = .error
+        case .info: type = .connection
+        }
+        watchManagerDelegate?.deviceManager(self, logEventForDeviceIdentifier: settings.watchfaceUUID.uuidString.lowercased(), type: type, message: message, completion: nil)
+    }
+}
+
+// MARK: - AlertResponder, AlertSoundVendor
+
+extension LupedWatchManager {
+    public func acknowledgeAlert(alertIdentifier: Alert.AlertIdentifier) async throws {}
+
+    public func getSoundBaseURL() -> URL? { nil }
+    public func getSounds() -> [Alert.Sound] { [] }
+}
+
+// MARK: - CustomDebugStringConvertible
+
+extension LupedWatchManager {
+    public var debugDescription: String {
+        let settings = settings
+        return [
+            "## LupedWatchManager",
+            "* enabled: \(settings.isEnabled)",
+            "* watchfaceUUID: \(settings.watchfaceUUID.uuidString.lowercased())",
+            "* alarmsEnabled: \(settings.alarmsEnabled)",
+            "* followAlertMute: \(settings.followAlertMute)",
+            "* fullScreen: \(settings.fullScreen)",
+        ].joined(separator: "\n")
+    }
+}
+
+private extension LupedAlertState {
+    init(_ state: WatchGlucoseAlertState?) {
+        self.init(
+            configuration: state?.configuration.map { configuration in
+                LupedAlertConfiguration(
+                    urgentLowMgDL: configuration.urgentLowThreshold,
+                    lowMgDL: configuration.lowThreshold,
+                    highMgDL: configuration.highThreshold,
+                    urgentLowEnabled: configuration.urgentLowEnabled,
+                    lowEnabled: configuration.lowEnabled,
+                    highEnabled: configuration.highEnabled,
+                    urgentLowRepeat: configuration.urgentLowRepeatInterval,
+                    lowRepeat: configuration.lowRepeatInterval,
+                    highRepeat: configuration.highRepeatInterval
+                )
+            },
+            hostAlertsActive: state?.loopAlertsActive ?? false,
+            hostMuteEnd: state?.mutedUntil
+        )
+    }
+}
+
+private extension LupedTrend {
+    init(_ trend: GlucoseTrend) {
+        switch trend {
+        case .downDownDown: self = .doubleDown
+        case .downDown: self = .singleDown
+        case .down: self = .fortyFiveDown
+        case .flat: self = .flat
+        case .up: self = .fortyFiveUp
+        case .upUp: self = .singleUp
+        case .upUpUp: self = .doubleUp
+        }
+    }
+}
