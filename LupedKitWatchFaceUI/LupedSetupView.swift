@@ -76,9 +76,10 @@ struct LupedSetupIntroView: View {
             List {
                 Section {
                     VStack(spacing: 12) {
-                        Image(systemName: "watch.analog")
-                            .font(.system(size: 64, weight: .light))
-                            .foregroundColor(.accentColor)
+                        Image(uiImage: PebbleArtwork.image)
+                            .resizable()
+                            .scaledToFit()
+                            .frame(height: 110)
                             .accessibilityHidden(true)
                         Text(LocalizedString("Loop sends each new glucose reading to your Pebble as soon as it arrives, and the watch vibrates for lows and highs.", comment: "Pebble setup introduction"))
                             .multilineTextAlignment(.center)

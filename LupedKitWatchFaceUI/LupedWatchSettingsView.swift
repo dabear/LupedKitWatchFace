@@ -213,21 +213,53 @@ struct LupedLinkStatusSection: View {
         }
     }
 
+    @ViewBuilder
+    private var statusIcon: some View {
+        switch status.link {
+        case .connecting, .waitingForWatch:
+            ProgressView()
+        case .open where !status.paused && !watchfaceRejected:
+            Image(systemName: "checkmark.circle.fill").foregroundColor(.green)
+        case .off:
+            Image(systemName: "minus.circle").foregroundColor(.secondary)
+        default:
+            Image(systemName: "exclamationmark.triangle.fill").foregroundColor(color)
+        }
+    }
+
+    /// Device card like the CGM and pump settings screens: picture, model and link state.
+    private var deviceCard: some View {
+        HStack(spacing: 16) {
+            Image(uiImage: PebbleArtwork.image)
+                .resizable()
+                .scaledToFit()
+                .frame(height: 76)
+                .accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: 6) {
+                Text(LupedWatchManager.localizedTitle)
+                    .font(.title3.bold())
+                HStack(spacing: 6) {
+                    statusIcon
+                    Text(headline)
+                        .font(.subheadline)
+                        .foregroundColor(status.link == .open && !status.paused && !watchfaceRejected ? .primary : color)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+        }
+        .padding(.vertical, 6)
+    }
+
     var body: some View {
         Section {
-            HStack(spacing: 8) {
-                Circle().fill(color).frame(width: 10, height: 10)
-                Text(headline).bold()
-            }
+            deviceCard
             if let delivery = status.lastDelivery {
-                Text(String(format: LocalizedString("Last reading %1$@ delivered at %2$@ in %3$d ms", comment: "Pebble status detail (1: reading time, 2: delivery time, 3: round trip)"), Self.timeFormatter.string(from: delivery.readingDate), Self.timeFormatter.string(from: delivery.deliveredAt), delivery.milliseconds))
-                    .font(.footnote)
-                    .foregroundColor(.secondary)
+                LabeledContent(LocalizedString("Last Reading", comment: "Pebble status row: time of the last delivered glucose reading"), value: Self.timeFormatter.string(from: delivery.readingDate))
+                LabeledContent(LocalizedString("Delivered", comment: "Pebble status row: when the watch acknowledged the reading"), value: Self.timeFormatter.string(from: delivery.deliveredAt))
+                LabeledContent(LocalizedString("Round Trip", comment: "Pebble status row: send to acknowledgement time"), value: String(format: LocalizedString("%d ms", comment: "Pebble round trip in milliseconds (1: milliseconds)"), delivery.milliseconds))
             }
             if let retryAt = status.retryAt {
-                Text(String(format: LocalizedString("Next retry at %@", comment: "Pebble status detail (1: retry time)"), Self.timeFormatter.string(from: retryAt)))
-                    .font(.footnote)
-                    .foregroundColor(.secondary)
+                LabeledContent(LocalizedString("Next Retry", comment: "Pebble status row: time of the next delivery attempt"), value: Self.timeFormatter.string(from: retryAt))
             }
             Button(LocalizedString("Send Now", comment: "Button pushing the current reading to the Pebble watch")) {
                 transport.sendNow()
@@ -324,9 +356,17 @@ struct LupedCommunicationLogView: View {
                         Text(Self.timeFormatter.string(from: entry.date))
                             .font(.caption2.monospacedDigit())
                             .foregroundColor(.secondary)
-                        Text(entry.message)
-                            .font(.caption.monospaced())
+                        // First line is the headline; the rest are aligned detail rows.
+                        let lines = entry.message.split(separator: "\n", maxSplits: 1, omittingEmptySubsequences: false)
+                        Text(lines.first.map(String.init) ?? entry.message)
+                            .font(.caption.monospaced().weight(.semibold))
                             .textSelection(.enabled)
+                        if lines.count > 1 {
+                            Text(String(lines[1]))
+                                .font(.caption2.monospaced())
+                                .foregroundColor(.secondary)
+                                .textSelection(.enabled)
+                        }
                     }
                 }
             }
