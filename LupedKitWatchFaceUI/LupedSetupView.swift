@@ -15,8 +15,8 @@ let lupedWatchfaceStoreURL = URL(string: "https://apps.repebble.com/luped-cgm_d4
 
 /// Adds a Pebble. The Pebble app already pairs the watch, so setup only sets
 /// expectations, adds the watch, and confirms that a reading reached it.
-final class LupedSetupNavigationController: UINavigationController, WatchManagerOnboarding, CompletionNotifying {
-    weak var watchManagerOnboardingDelegate: WatchManagerOnboardingDelegate?
+final class LupedSetupNavigationController: UINavigationController, SmartwatchManagerOnboarding, CompletionNotifying {
+    weak var smartwatchManagerOnboardingDelegate: SmartwatchManagerOnboardingDelegate?
     weak var completionDelegate: CompletionDelegate?
 
     init() {
@@ -25,8 +25,8 @@ final class LupedSetupNavigationController: UINavigationController, WatchManager
         model.didAdd = { [weak self] manager in
             // The watch manager is onboarded as soon as it exists; the host
             // starts sending it snapshots right away.
-            self?.watchManagerOnboardingDelegate?.watchManagerOnboarding(didCreateWatchManager: manager)
-            self?.watchManagerOnboardingDelegate?.watchManagerOnboarding(didOnboardWatchManager: manager)
+            self?.smartwatchManagerOnboardingDelegate?.smartwatchManagerOnboarding(didCreateSmartwatchManager: manager)
+            self?.smartwatchManagerOnboardingDelegate?.smartwatchManagerOnboarding(didOnboardSmartwatchManager: manager)
         }
         let view = LupedSetupView(model: model) { [weak self] in
             guard let self else { return }

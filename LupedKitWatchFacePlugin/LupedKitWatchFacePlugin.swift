@@ -10,10 +10,10 @@ import LoopKitUI
 import LupedKitWatchFace
 import LupedKitWatchFaceUI
 
-class LupedKitWatchFacePlugin: NSObject, WatchManagerUIPlugin {
+class LupedKitWatchFacePlugin: NSObject, SmartwatchManagerUIPlugin {
     private let log = OSLog(subsystem: "org.loopkit.LupedKitWatchFace", category: "LupedKitWatchFacePlugin")
 
-    public var watchManagerType: WatchManagerUI.Type? {
+    public var smartwatchManagerType: SmartwatchManagerUI.Type? {
         return LupedWatchManager.self
     }
 

@@ -1,11 +1,11 @@
 # LupedKitWatchFace
 
-A Loop `WatchManager` plugin that shows Loop's glucose on a Pebble running the
+A Loop `SmartwatchManager` plugin that shows Loop's glucose on a Pebble running the
 [Luped CGM watchface](https://github.com/dabear/CrimsonBearPebbleWatchFace),
 over [elbbepTransport](https://github.com/dabear/elbbepTransport)'s direct
 Bluetooth link (no PebbleKit JS, no phone-side Pebble SDK).
 
-It is the first plugin for the `WatchManager` plugin type proposed for
+It is the first plugin for the `SmartwatchManager` plugin type proposed for
 [LoopKit/Loop#2568](https://github.com/LoopKit/Loop/pull/2568). Loop sends the
 plugin a `WatchStatusSnapshot` as soon as a new glucose reading is stored,
 before the loop runs, and the plugin pushes it to the watch right away. The
@@ -16,9 +16,9 @@ settings and alert mute.
 
 | Target | What it holds |
 |---|---|
-| `LupedKitWatchFace` | `LupedWatchManager: WatchManager`. Turns snapshots into LupedKit payloads, keeps Luped's settings in `rawState`, and forwards the watch communication log to Loop's device log. Re-exports `LupedKit`. |
-| `LupedKitWatchFaceUI` | `WatchManagerUI` conformance and the Settings → Devices → Pebble screens: status, display, alarms, diagnostics, communication log, watchface UUID. |
-| `LupedKitWatchFacePlugin` | The `.loopplugin` principal class and Info.plist keys (`com.loopkit.Loop.WatchManagerIdentifier`). |
+| `LupedKitWatchFace` | `LupedWatchManager: SmartwatchManager`. Turns snapshots into LupedKit payloads, keeps Luped's settings in `rawState`, and forwards the watch communication log to Loop's device log. Re-exports `LupedKit`. |
+| `LupedKitWatchFaceUI` | `SmartwatchManagerUI` conformance and the Settings → Devices → Pebble screens: status, display, alarms, diagnostics, communication log, watchface UUID. |
+| `LupedKitWatchFacePlugin` | The `.loopplugin` principal class and Info.plist keys (`com.loopkit.Loop.SmartwatchManagerIdentifier`). |
 | `LupedKitWatchFaceTests` | Unit tests, including the device-log mapping. |
 
 Capabilities: `.glucose`, `.history`, `.alerts`.
@@ -39,7 +39,7 @@ event log export:
 
 ## Building
 
-The plugin needs a LoopKit and Loop that include the `WatchManager` plugin type,
+The plugin needs a LoopKit and Loop that include the `SmartwatchManager` plugin type,
 and builds inside a LoopWorkspace. The `watch-manager` branch of
 [dabear/LoopWorkspace](https://github.com/dabear/LoopWorkspace/tree/watch-manager)
 has everything wired up:

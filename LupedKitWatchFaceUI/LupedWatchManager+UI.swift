@@ -11,7 +11,7 @@ import LupedKitWatchFace
 import SwiftUI
 import UIKit
 
-extension LupedWatchManager: WatchManagerUI {
+extension LupedWatchManager: SmartwatchManagerUI {
     public static var onboardingImage: UIImage? {
         PebbleArtwork.image
     }
@@ -24,12 +24,12 @@ extension LupedWatchManager: WatchManagerUI {
     /// publishes the Bluetooth service, so setup only explains what is needed,
     /// adds the watch, and confirms that a reading reached it.
     @MainActor
-    public static func setupViewController(bluetoothProvider: BluetoothProvider, displayGlucosePreference: DisplayGlucosePreference, colorPalette: LoopUIColorPalette, allowDebugFeatures: Bool) -> SetupUIResult<WatchManagerViewController, WatchManagerUI> {
+    public static func setupViewController(bluetoothProvider: BluetoothProvider, displayGlucosePreference: DisplayGlucosePreference, colorPalette: LoopUIColorPalette, allowDebugFeatures: Bool) -> SetupUIResult<SmartwatchManagerViewController, SmartwatchManagerUI> {
         .userInteractionRequired(LupedSetupNavigationController())
     }
 
     @MainActor
-    public func settingsViewController(bluetoothProvider: BluetoothProvider, displayGlucosePreference: DisplayGlucosePreference, colorPalette: LoopUIColorPalette, allowDebugFeatures: Bool) -> WatchManagerViewController {
+    public func settingsViewController(bluetoothProvider: BluetoothProvider, displayGlucosePreference: DisplayGlucosePreference, colorPalette: LoopUIColorPalette, allowDebugFeatures: Bool) -> SmartwatchManagerViewController {
         LupedSettingsNavigationController(manager: self)
     }
 
@@ -99,8 +99,8 @@ enum PebbleArtwork {
 }
 
 /// Hosts the Pebble settings screens.
-final class LupedSettingsNavigationController: UINavigationController, WatchManagerOnboarding, CompletionNotifying {
-    weak var watchManagerOnboardingDelegate: WatchManagerOnboardingDelegate?
+final class LupedSettingsNavigationController: UINavigationController, SmartwatchManagerOnboarding, CompletionNotifying {
+    weak var smartwatchManagerOnboardingDelegate: SmartwatchManagerOnboardingDelegate?
     weak var completionDelegate: CompletionDelegate?
 
     init(manager: LupedWatchManager) {

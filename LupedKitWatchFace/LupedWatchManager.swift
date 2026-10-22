@@ -16,7 +16,7 @@ import LoopKit
 /// Loop sends a snapshot as soon as a new reading is stored; it is forwarded
 /// to the watch right away. The watch alarms on its own using Loop's glucose
 /// alert settings, so it also receives Loop's alert state and mute.
-public final class LupedWatchManager: WatchManager {
+public final class LupedWatchManager: SmartwatchManager {
     public static let pluginIdentifier = "LupedWatchManager"
     public static let localizedTitle = LocalizedString("Pebble", comment: "Title of the Luped Pebble watch manager")
 
@@ -25,7 +25,7 @@ public final class LupedWatchManager: WatchManager {
     public var pluginIdentifier: String { Self.pluginIdentifier }
     public var localizedTitle: String { Self.localizedTitle }
 
-    public weak var watchManagerDelegate: WatchManagerDelegate?
+    public weak var smartwatchManagerDelegate: SmartwatchManagerDelegate?
 
     public var delegateQueue: DispatchQueue! {
         get { lockedDelegateQueue.value }
@@ -42,7 +42,7 @@ public final class LupedWatchManager: WatchManager {
             Task { @MainActor in
                 self.transportIfStarted?.settings = newValue
             }
-            watchManagerDelegate?.watchManagerDidUpdateState(self)
+            smartwatchManagerDelegate?.smartwatchManagerDidUpdateState(self)
         }
     }
     private let lockedSettings: Locked<LupedSettings>
@@ -148,7 +148,7 @@ public final class LupedWatchManager: WatchManager {
         case .error: type = .error
         case .info: type = .connection
         }
-        watchManagerDelegate?.deviceManager(self, logEventForDeviceIdentifier: settings.watchfaceUUID.uuidString.lowercased(), type: type, message: message, completion: nil)
+        smartwatchManagerDelegate?.deviceManager(self, logEventForDeviceIdentifier: settings.watchfaceUUID.uuidString.lowercased(), type: type, message: message, completion: nil)
     }
 }
 

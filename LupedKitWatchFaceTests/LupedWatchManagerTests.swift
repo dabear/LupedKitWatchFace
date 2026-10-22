@@ -32,8 +32,8 @@ final class LupedWatchManagerTests: XCTestCase {
 
     func testSettingsChangesSaveState() {
         let manager = LupedWatchManager(settings: LupedSettings(isEnabled: false))
-        let delegate = MockWatchManagerDelegate()
-        manager.watchManagerDelegate = delegate
+        let delegate = MockSmartwatchManagerDelegate()
+        manager.smartwatchManagerDelegate = delegate
         manager.settings.fullScreen = true
         XCTAssertEqual(delegate.stateUpdates, 1)
         manager.settings.fullScreen = true
@@ -45,8 +45,8 @@ final class LupedWatchManagerTests: XCTestCase {
     func testCommunicationLogReachesDeviceLog() async throws {
         let uuid = UUID()
         let manager = LupedWatchManager(settings: LupedSettings(isEnabled: false, watchfaceUUID: uuid))
-        let delegate = MockWatchManagerDelegate()
-        manager.watchManagerDelegate = delegate
+        let delegate = MockSmartwatchManagerDelegate()
+        manager.smartwatchManagerDelegate = delegate
         _ = manager.transport
 
         // The test runner has no background modes, so starting the link warns once.
@@ -77,8 +77,8 @@ final class LupedWatchManagerTests: XCTestCase {
     /// switches the Bluetooth link off.
     func testDeleteRemovesTheManagerAndStopsTheLink() async {
         let manager = LupedWatchManager(settings: LupedSettings(isEnabled: true))
-        let delegate = MockWatchManagerDelegate()
-        manager.watchManagerDelegate = delegate
+        let delegate = MockSmartwatchManagerDelegate()
+        manager.smartwatchManagerDelegate = delegate
         manager.transportIfStarted = LupedTransport(hostName: "Loop", settings: manager.settings)
 
         let deleted = expectation(description: "delete completes")
@@ -116,7 +116,7 @@ final class LupedWatchManagerTests: XCTestCase {
     }
 }
 
-private final class MockWatchManagerDelegate: WatchManagerDelegate {
+private final class MockSmartwatchManagerDelegate: SmartwatchManagerDelegate {
     struct LogEntry {
         let deviceIdentifier: String?
         let type: DeviceLogEntryType
@@ -131,11 +131,11 @@ private final class MockWatchManagerDelegate: WatchManagerDelegate {
         logEntries.append(LogEntry(deviceIdentifier: deviceIdentifier, type: type, message: message))
     }
 
-    func watchManagerDidUpdateState(_ manager: WatchManager) { stateUpdates += 1 }
-    func watchManagerWantsDeletion(_ manager: WatchManager) async { deletions += 1 }
-    func watchManager(_ manager: WatchManager, glucoseSamplesSince start: Date) async throws -> [StoredGlucoseSample] { [] }
-    func watchManagerRequestsRefresh(_ manager: WatchManager) {}
-    func watchManager(_ manager: WatchManager, requestBolus request: WatchBolusRequest) async throws -> Double { throw WatchBolusError.notAllowed }
+    func smartwatchManagerDidUpdateState(_ manager: SmartwatchManager) { stateUpdates += 1 }
+    func smartwatchManagerWantsDeletion(_ manager: SmartwatchManager) async { deletions += 1 }
+    func smartwatchManager(_ manager: SmartwatchManager, glucoseSamplesSince start: Date) async throws -> [StoredGlucoseSample] { [] }
+    func smartwatchManagerRequestsRefresh(_ manager: SmartwatchManager) {}
+    func smartwatchManager(_ manager: SmartwatchManager, requestBolus request: WatchBolusRequest) async throws -> Double { throw WatchBolusError.notAllowed }
 
     func issueAlert(_ alert: Alert) async {}
     func retractAlert(identifier: Alert.Identifier) async {}
