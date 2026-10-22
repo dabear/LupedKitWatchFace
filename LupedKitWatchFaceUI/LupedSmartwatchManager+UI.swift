@@ -1,5 +1,5 @@
 //
-//  LupedWatchManager+UI.swift
+//  LupedSmartwatchManager+UI.swift
 //  LupedKitWatchFaceUI
 //
 //  Copyright © 2026 LoopKit Authors. All rights reserved.
@@ -11,7 +11,7 @@ import LupedKitWatchFace
 import SwiftUI
 import UIKit
 
-extension LupedWatchManager: SmartwatchManagerUI {
+extension LupedSmartwatchManager: SmartwatchManagerUI {
     public static var onboardingImage: UIImage? {
         PebbleArtwork.image
     }
@@ -103,7 +103,7 @@ final class LupedSettingsNavigationController: UINavigationController, Smartwatc
     weak var smartwatchManagerOnboardingDelegate: SmartwatchManagerOnboardingDelegate?
     weak var completionDelegate: CompletionDelegate?
 
-    init(manager: LupedWatchManager) {
+    init(manager: LupedSmartwatchManager) {
         super.init(nibName: nil, bundle: nil)
         let model = LupedSettingsModel(manager: manager)
         let view = LupedWatchSettingsView(model: model) { [weak self] in

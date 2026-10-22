@@ -1,5 +1,5 @@
 //
-//  LupedWatchManager.swift
+//  LupedSmartwatchManager.swift
 //  LupedKitWatchFace
 //
 //  Copyright © 2026 LoopKit Authors. All rights reserved.
@@ -7,20 +7,26 @@
 
 @_exported import LupedKit
 import Foundation
-import LoopAlgorithm
 import LoopKit
 
-/// Shows Loop's glucose on a Pebble running the Luped watchface, over
+/// Shows the host app's glucose on a Pebble running the Luped watchface, over
 /// LupedKit's direct Bluetooth link.
 ///
-/// Loop sends a snapshot as soon as a new reading is stored; it is forwarded
-/// to the watch right away. The watch alarms on its own using Loop's glucose
-/// alert settings, so it also receives Loop's alert state and mute.
-public final class LupedWatchManager: SmartwatchManager {
-    public static let pluginIdentifier = "LupedWatchManager"
+/// The host sends a snapshot as soon as a new reading is stored; it is
+/// forwarded to the watch right away. The watch alarms on its own using the
+/// host's glucose alert settings, so it also receives its alert state and mute.
+public final class LupedSmartwatchManager: SmartwatchManager {
+    public static let pluginIdentifier = "LupedSmartwatchManager"
+
+    /// The host app's name, for status and log messages.
+    public static var hostName: String {
+        Bundle.main.object(forInfoDictionaryKey: "CFBundleDisplayName") as? String
+            ?? Bundle.main.object(forInfoDictionaryKey: "CFBundleName") as? String
+            ?? "Loop"
+    }
     public static let localizedTitle = LocalizedString("Pebble", comment: "Title of the Luped Pebble watch manager")
 
-    public static var capabilities: WatchCapabilities { [.glucose, .history, .alerts] }
+    public static var capabilities: SmartwatchCapabilities { [.glucose, .history, .alerts] }
 
     public var pluginIdentifier: String { Self.pluginIdentifier }
     public var localizedTitle: String { Self.localizedTitle }
@@ -47,8 +53,8 @@ public final class LupedWatchManager: SmartwatchManager {
     }
     private let lockedSettings: Locked<LupedSettings>
 
-    @MainActor var latestSnapshot: WatchStatusSnapshot?
-    @MainActor var latestAlertState: WatchGlucoseAlertState?
+    @MainActor var latestSnapshot: SmartwatchStatusSnapshot?
+    @MainActor var latestAlertState: SmartwatchGlucoseAlertState?
     @MainActor var transportIfStarted: LupedTransport?
 
     public init(settings: LupedSettings = LupedSettings(isEnabled: true)) {
@@ -73,7 +79,7 @@ public final class LupedWatchManager: SmartwatchManager {
         if let transportIfStarted {
             return transportIfStarted
         }
-        let transport = LupedTransport(hostName: "Loop", settings: settings)
+        let transport = LupedTransport(hostName: Self.hostName, settings: settings)
         transport.diagnosticLog = { [weak self] kind, message in
             self?.logDeviceCommunication(message, kind: kind)
         }
@@ -83,7 +89,7 @@ public final class LupedWatchManager: SmartwatchManager {
         transportIfStarted = transport
         transport.start()
         if !Self.hasBluetoothPeripheralBackgroundMode() {
-            logDeviceCommunication("Loop was built without the bluetooth-peripheral background mode (LOOP_BLUETOOTH_PERIPHERAL_BACKGROUND_MODE = NO): the watch only updates while Loop is in the foreground", kind: .error)
+            logDeviceCommunication("\(Self.hostName) was built without the bluetooth-peripheral background mode: the watch only updates while \(Self.hostName) is in the foreground", kind: .error)
         }
         return transport
     }
@@ -94,13 +100,13 @@ public final class LupedWatchManager: SmartwatchManager {
     }
 
     @MainActor
-    public func watchDataDidUpdate(_ snapshot: WatchStatusSnapshot) {
+    public func watchDataDidUpdate(_ snapshot: SmartwatchStatusSnapshot) {
         latestSnapshot = snapshot
         Task { await transport.refresh() }
     }
 
     @MainActor
-    public func glucoseAlertStateDidUpdate(_ state: WatchGlucoseAlertState) {
+    public func glucoseAlertStateDidUpdate(_ state: SmartwatchGlucoseAlertState) {
         latestAlertState = state
         // The first snapshot sends the alert state with it.
         if latestSnapshot != nil {
@@ -122,13 +128,13 @@ public final class LupedWatchManager: SmartwatchManager {
             return nil
         }
         let start = Date(timeIntervalSinceNow: -LupedPayload.historyInterval)
-        let samples = snapshot.glucoseHistory.filter { $0.startDate >= start }
+        let samples = snapshot.glucoseHistory.filter { $0.date >= start }
         let readings = samples
             .filter { !$0.wasUserEntered && !$0.isDisplayOnly }
             .map { sample in
                 LupedReading(
-                    date: sample.startDate,
-                    milligramsPerDeciliter: sample.quantity.doubleValue(for: .milligramsPerDeciliter),
+                    date: sample.date,
+                    milligramsPerDeciliter: sample.milligramsPerDeciliter,
                     trend: sample.trend.map(LupedTrend.init)
                 )
             }
@@ -152,22 +158,13 @@ public final class LupedWatchManager: SmartwatchManager {
     }
 }
 
-// MARK: - AlertResponder, AlertSoundVendor
-
-extension LupedWatchManager {
-    public func acknowledgeAlert(alertIdentifier: Alert.AlertIdentifier) async throws {}
-
-    public func getSoundBaseURL() -> URL? { nil }
-    public func getSounds() -> [Alert.Sound] { [] }
-}
-
 // MARK: - CustomDebugStringConvertible
 
-extension LupedWatchManager {
+extension LupedSmartwatchManager {
     public var debugDescription: String {
         let settings = settings
         return [
-            "## LupedWatchManager",
+            "## LupedSmartwatchManager",
             "* enabled: \(settings.isEnabled)",
             "* watchfaceUUID: \(settings.watchfaceUUID.uuidString.lowercased())",
             "* alarmsEnabled: \(settings.alarmsEnabled)",
@@ -178,7 +175,7 @@ extension LupedWatchManager {
 }
 
 private extension LupedAlertState {
-    init(_ state: WatchGlucoseAlertState?) {
+    init(_ state: SmartwatchGlucoseAlertState?) {
         self.init(
             configuration: state?.configuration.map { configuration in
                 LupedAlertConfiguration(
@@ -193,7 +190,7 @@ private extension LupedAlertState {
                     highRepeat: configuration.highRepeatInterval
                 )
             },
-            hostAlertsActive: state?.loopAlertsActive ?? false,
+            hostAlertsActive: state?.hostAlertsActive ?? false,
             hostMuteEnd: state?.mutedUntil
         )
     }

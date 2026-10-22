@@ -1,23 +1,22 @@
 //
-//  LupedWatchManagerTests.swift
+//  LupedSmartwatchManagerTests.swift
 //  LupedKitWatchFaceTests
 //
 //  Copyright © 2026 LoopKit Authors. All rights reserved.
 //
 
 import XCTest
-import LoopAlgorithm
 import LoopKit
 @testable import LupedKitWatchFace
 
 @MainActor
-final class LupedWatchManagerTests: XCTestCase {
+final class LupedSmartwatchManagerTests: XCTestCase {
     private let start = Date(timeIntervalSinceNow: -1_800)
 
-    private func sample(_ mgdl: Double, minutes: Double, trend: GlucoseTrend? = .flat, wasUserEntered: Bool = false) -> StoredGlucoseSample {
-        StoredGlucoseSample(
-            startDate: start.addingTimeInterval(minutes * 60),
-            quantity: LoopQuantity(unit: .milligramsPerDeciliter, doubleValue: mgdl),
+    private func sample(_ mgdl: Double, minutes: Double, trend: GlucoseTrend? = .flat, wasUserEntered: Bool = false) -> SmartwatchGlucoseReading {
+        SmartwatchGlucoseReading(
+            date: start.addingTimeInterval(minutes * 60),
+            milligramsPerDeciliter: mgdl,
             trend: trend,
             wasUserEntered: wasUserEntered
         )
@@ -25,13 +24,13 @@ final class LupedWatchManagerTests: XCTestCase {
 
     func testRawStateRoundTrips() throws {
         let settings = LupedSettings(isEnabled: true, watchfaceUUID: UUID(), alarmsEnabled: false, followAlertMute: false, fullScreen: true)
-        let manager = LupedWatchManager(settings: settings)
-        let restored = try XCTUnwrap(LupedWatchManager(rawState: manager.rawState))
+        let manager = LupedSmartwatchManager(settings: settings)
+        let restored = try XCTUnwrap(LupedSmartwatchManager(rawState: manager.rawState))
         XCTAssertEqual(restored.settings, settings)
     }
 
     func testSettingsChangesSaveState() {
-        let manager = LupedWatchManager(settings: LupedSettings(isEnabled: false))
+        let manager = LupedSmartwatchManager(settings: LupedSettings(isEnabled: false))
         let delegate = MockSmartwatchManagerDelegate()
         manager.smartwatchManagerDelegate = delegate
         manager.settings.fullScreen = true
@@ -44,13 +43,13 @@ final class LupedWatchManagerTests: XCTestCase {
     /// watchface UUID, with each kind mapped to its device log type.
     func testCommunicationLogReachesDeviceLog() async throws {
         let uuid = UUID()
-        let manager = LupedWatchManager(settings: LupedSettings(isEnabled: false, watchfaceUUID: uuid))
+        let manager = LupedSmartwatchManager(settings: LupedSettings(isEnabled: false, watchfaceUUID: uuid))
         let delegate = MockSmartwatchManagerDelegate()
         manager.smartwatchManagerDelegate = delegate
         _ = manager.transport
 
         // The test runner has no background modes, so starting the link warns once.
-        XCTAssertFalse(LupedWatchManager.hasBluetoothPeripheralBackgroundMode())
+        XCTAssertFalse(LupedSmartwatchManager.hasBluetoothPeripheralBackgroundMode())
         XCTAssertEqual(delegate.logEntries.map(\.type), [.error])
         XCTAssertTrue(delegate.logEntries.first?.message.contains("bluetooth-peripheral") == true)
         delegate.logEntries.removeAll()
@@ -76,10 +75,10 @@ final class LupedWatchManagerTests: XCTestCase {
     /// Delete from the settings screen asks the host to remove the manager and
     /// switches the Bluetooth link off.
     func testDeleteRemovesTheManagerAndStopsTheLink() async {
-        let manager = LupedWatchManager(settings: LupedSettings(isEnabled: true))
+        let manager = LupedSmartwatchManager(settings: LupedSettings(isEnabled: true))
         let delegate = MockSmartwatchManagerDelegate()
         manager.smartwatchManagerDelegate = delegate
-        manager.transportIfStarted = LupedTransport(hostName: "Loop", settings: manager.settings)
+        manager.transportIfStarted = LupedTransport(hostName: LupedSmartwatchManager.hostName, settings: manager.settings)
 
         let deleted = expectation(description: "delete completes")
         manager.delete { deleted.fulfill() }
@@ -90,7 +89,7 @@ final class LupedWatchManagerTests: XCTestCase {
     }
 
     func testSnapshotBecomesLupedSnapshot() throws {
-        let manager = LupedWatchManager(settings: LupedSettings(isEnabled: false))
+        let manager = LupedSmartwatchManager(settings: LupedSettings(isEnabled: false))
         XCTAssertNil(manager.lupedSnapshot(), "Nothing to send before the first snapshot")
 
         let history = [
@@ -98,10 +97,10 @@ final class LupedWatchManagerTests: XCTestCase {
             sample(250, minutes: 2, wasUserEntered: true),
             sample(110, minutes: 5, trend: .upUp),
         ]
-        manager.latestSnapshot = WatchStatusSnapshot(displayUnit: .millimolesPerLiter, glucose: history.last, glucoseHistory: history)
-        manager.latestAlertState = WatchGlucoseAlertState(
+        manager.latestSnapshot = SmartwatchStatusSnapshot(displayUnit: .millimolesPerLiter, glucose: history.last, glucoseHistory: history)
+        manager.latestAlertState = SmartwatchGlucoseAlertState(
             configuration: .init(urgentLowThreshold: 55, lowThreshold: 70, highThreshold: 180, urgentLowEnabled: true, lowEnabled: true, highEnabled: false, urgentLowRepeatInterval: 300, lowRepeatInterval: nil, highRepeatInterval: 3_600),
-            loopAlertsActive: true,
+            hostAlertsActive: true,
             mutedUntil: nil
         )
 
@@ -133,9 +132,9 @@ private final class MockSmartwatchManagerDelegate: SmartwatchManagerDelegate {
 
     func smartwatchManagerDidUpdateState(_ manager: SmartwatchManager) { stateUpdates += 1 }
     func smartwatchManagerWantsDeletion(_ manager: SmartwatchManager) async { deletions += 1 }
-    func smartwatchManager(_ manager: SmartwatchManager, glucoseSamplesSince start: Date) async throws -> [StoredGlucoseSample] { [] }
+    func smartwatchManager(_ manager: SmartwatchManager, glucoseSamplesSince start: Date) async throws -> [SmartwatchGlucoseReading] { [] }
     func smartwatchManagerRequestsRefresh(_ manager: SmartwatchManager) {}
-    func smartwatchManager(_ manager: SmartwatchManager, requestBolus request: WatchBolusRequest) async throws -> Double { throw WatchBolusError.notAllowed }
+    func smartwatchManager(_ manager: SmartwatchManager, requestBolus request: SmartwatchBolusRequest) async throws -> Double { throw SmartwatchBolusError.notAllowed }
 
     func issueAlert(_ alert: Alert) async {}
     func retractAlert(identifier: Alert.Identifier) async {}

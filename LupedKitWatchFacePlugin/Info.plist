@@ -23,10 +23,10 @@
 	<key>com.loopkit.Loop.SmartwatchManagerDisplayName</key>
 	<string>Pebble (Luped CGM watchface)</string>
 	<key>com.loopkit.Loop.SmartwatchManagerIdentifier</key>
-	<string>LupedWatchManager</string>
+	<string>LupedSmartwatchManager</string>
 	<key>com.loopkit.Loop.DeviceManufacturer</key>
 	<string>Core Devices</string>
 	<key>com.loopkit.Loop.PluginSubtitle</key>
-	<string>Pebble 2 Duo, Pebble Time 2, Pebble Round 2, and older Pebbles</string>
+	<string>Pebble Time 2 and Pebble Round 2 from Core Devices</string>
 </dict>
 </plist>

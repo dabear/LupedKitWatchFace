@@ -14,7 +14,7 @@ class LupedKitWatchFacePlugin: NSObject, SmartwatchManagerUIPlugin {
     private let log = OSLog(subsystem: "org.loopkit.LupedKitWatchFace", category: "LupedKitWatchFacePlugin")
 
     public var smartwatchManagerType: SmartwatchManagerUI.Type? {
-        return LupedWatchManager.self
+        return LupedSmartwatchManager.self
     }
 
     override init() {

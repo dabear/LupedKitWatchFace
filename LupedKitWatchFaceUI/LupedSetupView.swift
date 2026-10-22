@@ -42,12 +42,12 @@ final class LupedSetupNavigationController: UINavigationController, SmartwatchMa
 
 @MainActor
 final class LupedSetupModel: ObservableObject {
-    @Published private(set) var manager: LupedWatchManager?
-    var didAdd: (LupedWatchManager) -> Void = { _ in }
+    @Published private(set) var manager: LupedSmartwatchManager?
+    var didAdd: (LupedSmartwatchManager) -> Void = { _ in }
 
     func add() {
         guard manager == nil else { return }
-        let manager = LupedWatchManager()
+        let manager = LupedSmartwatchManager()
         self.manager = manager
         didAdd(manager)
     }
@@ -81,7 +81,7 @@ struct LupedSetupIntroView: View {
                             .scaledToFit()
                             .frame(height: 110)
                             .accessibilityHidden(true)
-                        Text(LocalizedString("Loop sends each new glucose reading to your Pebble as soon as it arrives, and the watch vibrates for lows and highs.", comment: "Pebble setup introduction"))
+                        Text(String(format: LocalizedString("%@ sends each new glucose reading to your Pebble as soon as it arrives, and the watch vibrates for lows and highs.", comment: "Pebble setup introduction (1: app name)"), LupedSmartwatchManager.hostName))
                             .multilineTextAlignment(.center)
                     }
                     .frame(maxWidth: .infinity)
@@ -89,7 +89,7 @@ struct LupedSetupIntroView: View {
                 }
 
                 Section {
-                    LupedChecklistRow(number: 1, text: LocalizedString("Pair your Pebble in the Pebble app.", comment: "Pebble setup checklist: pair the watch"))
+                    LupedChecklistRow(number: 1, text: LocalizedString("Pair a Core Devices Pebble Time 2 or Pebble Round 2 in the Pebble app. Older Pebbles can't run Luped CGM.", comment: "Pebble setup checklist: pair a supported watch"))
                     LupedChecklistRow(number: 2, text: LocalizedString("Install the Luped CGM watchface.", comment: "Pebble setup checklist: install the watchface")) {
                         Link(LocalizedString("Get Luped CGM", comment: "Link to the Luped CGM watchface in the Pebble app store"), destination: lupedWatchfaceStoreURL)
                             .font(.subheadline.weight(.semibold))
@@ -98,16 +98,16 @@ struct LupedSetupIntroView: View {
                 } header: {
                     Text(LocalizedString("Before You Start", comment: "Header for the Pebble setup checklist"))
                 } footer: {
-                    Text(LocalizedString("There is nothing to pair in Loop: the watch finds Loop over the Pebble app's Bluetooth connection.", comment: "Footer for the Pebble setup checklist"))
+                    Text(String(format: LocalizedString("There is nothing to pair in %1$@: the watch finds %1$@ over the Pebble app's Bluetooth connection.", comment: "Footer for the Pebble setup checklist (1: app name)"), LupedSmartwatchManager.hostName))
                 }
 
                 Section {
                     EmptyView()
                 } footer: {
                     VStack(alignment: .leading, spacing: 8) {
-                        Text(LocalizedString("Watch alarms use the thresholds from Loop's Glucose Alert Settings. You can turn them off for the watch alone later.", comment: "Pebble setup note about watch alarms"))
-                        if !LupedWatchManager.hasBluetoothPeripheralBackgroundMode() {
-                            Text(LocalizedString("This build of Loop updates the watch only while Loop is open. Build with LOOP_BLUETOOTH_PERIPHERAL_BACKGROUND_MODE = YES to update it in the background.", comment: "Pebble setup warning when the app lacks the bluetooth-peripheral background mode"))
+                        Text(String(format: LocalizedString("Watch alarms use the thresholds from %@'s glucose alert settings. You can turn them off for the watch alone later.", comment: "Pebble setup note about watch alarms (1: app name)"), LupedSmartwatchManager.hostName))
+                        if !LupedSmartwatchManager.hasBluetoothPeripheralBackgroundMode() {
+                            Text(String(format: LocalizedString("This build of %1$@ updates the watch only while %1$@ is open. Build it with the bluetooth-peripheral background mode to update the watch in the background.", comment: "Pebble setup warning when the app lacks the bluetooth-peripheral background mode (1: app name)"), LupedSmartwatchManager.hostName))
                                 .foregroundColor(.orange)
                         }
                     }
@@ -190,7 +190,7 @@ struct LupedSetupProgressView: View {
                 }
 
                 Section {
-                    LupedStepRow(done: true, text: LocalizedString("Loop is ready for the watch", comment: "Pebble setup step: Bluetooth service published"))
+                    LupedStepRow(done: true, text: String(format: LocalizedString("%@ is ready for the watch", comment: "Pebble setup step: Bluetooth service published (1: app name)"), LupedSmartwatchManager.hostName))
                     LupedStepRow(done: watchConnected, text: LocalizedString("Watch connected", comment: "Pebble setup step: watch connected"))
                     LupedStepRow(done: progress.isComplete, text: LocalizedString("Reading shown on the watch", comment: "Pebble setup step: reading delivered"))
                 }
@@ -216,7 +216,7 @@ struct LupedSetupProgressView: View {
                 Button(LocalizedString("Done", comment: "Button finishing Pebble setup"), action: finish)
                     .buttonStyle(ActionButtonStyle(progress.isComplete ? .primary : .secondary))
                 if !progress.isComplete {
-                    Text(LocalizedString("You can finish now. Loop keeps connecting in the background, and Settings → Devices → Pebble shows the status.", comment: "Note below the Done button while Pebble setup is still in progress"))
+                    Text(String(format: LocalizedString("You can finish now. %@ keeps connecting in the background, and Settings → Devices → Pebble shows the status.", comment: "Note below the Done button while Pebble setup is still in progress (1: app name)"), LupedSmartwatchManager.hostName))
                         .font(.footnote)
                         .foregroundColor(.secondary)
                         .multilineTextAlignment(.center)
@@ -266,17 +266,17 @@ struct LupedSetupProgressView: View {
     private var detail: String {
         switch progress {
         case .bluetoothUnavailable:
-            return LocalizedString("Turn on Bluetooth and allow Loop to use it in the Settings app.", comment: "Pebble setup detail: Bluetooth unavailable")
+            return String(format: LocalizedString("Turn on Bluetooth and allow %@ to use it in the Settings app.", comment: "Pebble setup detail: Bluetooth unavailable (1: app name)"), LupedSmartwatchManager.hostName)
         case .waitingForWatch:
-            return LocalizedString("Keep the watch nearby with the Pebble app running. The watch finds Loop by itself; this can take a minute.", comment: "Pebble setup detail: waiting for the watch")
+            return String(format: LocalizedString("Keep the watch nearby with the Pebble app running. The watch finds %@ by itself; this can take a minute.", comment: "Pebble setup detail: waiting for the watch (1: app name)"), LupedSmartwatchManager.hostName)
         case .connecting:
-            return LocalizedString("The watch found Loop.", comment: "Pebble setup detail: connecting")
+            return String(format: LocalizedString("The watch found %@.", comment: "Pebble setup detail: connecting (1: app name)"), LupedSmartwatchManager.hostName)
         case .waitingForReading:
-            return LocalizedString("Loop sends the next glucose reading as soon as it arrives. Tap Send Now to send the latest one.", comment: "Pebble setup detail: connected, no reading yet")
+            return String(format: LocalizedString("%@ sends the next glucose reading as soon as it arrives. Tap Send Now to send the latest one.", comment: "Pebble setup detail: connected, no reading yet (1: app name)"), LupedSmartwatchManager.hostName)
         case .watchfaceNotRunning:
-            return LocalizedString("The watch is connected, but Luped CGM isn't the active watchface, so it can't show readings. Select it on the watch; Loop tries again by itself.", comment: "Pebble setup detail: watchface not running")
+            return String(format: LocalizedString("The watch is connected, but Luped CGM isn't the active watchface, so it can't show readings. Select it on the watch; %@ tries again by itself.", comment: "Pebble setup detail: watchface not running (1: app name)"), LupedSmartwatchManager.hostName)
         case .delivered(let readingDate):
-            return String(format: LocalizedString("The reading from %@ is on your watch. New readings appear as soon as Loop receives them.", comment: "Pebble setup detail: done (1: reading time)"), Self.timeFormatter.string(from: readingDate))
+            return String(format: LocalizedString("The reading from %1$@ is on your watch. New readings appear as soon as %2$@ receives them.", comment: "Pebble setup detail: done (1: reading time, 2: app name)"), Self.timeFormatter.string(from: readingDate), LupedSmartwatchManager.hostName)
         }
     }
 }

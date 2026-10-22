@@ -12,13 +12,13 @@ import SwiftUI
 /// Publishes the manager's settings to SwiftUI and saves edits back to it.
 @MainActor
 final class LupedSettingsModel: ObservableObject {
-    let manager: LupedWatchManager
+    let manager: LupedSmartwatchManager
 
     @Published var settings: LupedSettings {
         didSet { manager.settings = settings }
     }
 
-    init(manager: LupedWatchManager) {
+    init(manager: LupedSmartwatchManager) {
         self.manager = manager
         settings = manager.settings
     }
@@ -47,12 +47,12 @@ struct LupedWatchSettingsView: View {
             Section {
                 Toggle(LocalizedString("Watch Alarms", comment: "Toggle enabling Pebble watch vibration alarms"), isOn: $model.settings.alarmsEnabled)
                 if model.settings.alarmsEnabled {
-                    Toggle(LocalizedString("Follow Loop Alert Mute", comment: "Toggle muting Pebble watch alarms while Loop's alerts are muted"), isOn: $model.settings.followAlertMute)
+                    Toggle(String(format: LocalizedString("Follow %@ Alert Mute", comment: "Toggle muting Pebble watch alarms while Loop's alerts are muted (1: app name)"), LupedSmartwatchManager.hostName), isOn: $model.settings.followAlertMute)
                 }
             } header: {
                 Text(LocalizedString("Alarms", comment: "Header for the Pebble alarm settings"))
             } footer: {
-                Text(LocalizedString("The watch vibrates using the thresholds, on/off switches and repeat intervals from Glucose Alert Settings. Turning Watch Alarms off silences the watch only; Loop's alerts are unaffected. With Follow Loop Alert Mute, the watch stays silent while Loop's alerts are muted and resumes when the mute ends.", comment: "Footer for the Pebble alarm settings"))
+                Text(String(format: LocalizedString("The watch vibrates using the thresholds, on/off switches and repeat intervals from %1$@'s glucose alert settings. Turning Watch Alarms off silences the watch only; %1$@'s alerts are unaffected. With Follow %1$@ Alert Mute, the watch stays silent while %1$@'s alerts are muted and resumes when the mute ends.", comment: "Footer for the Pebble alarm settings (1: app name)"), LupedSmartwatchManager.hostName))
             }
 
             Section {
@@ -72,7 +72,7 @@ struct LupedWatchSettingsView: View {
                         .foregroundColor(.red)
                 }
             } footer: {
-                Text(LocalizedString("Loop sends glucose readings and glucose alert settings to a Pebble watchface over Bluetooth while the watch is paired with the Pebble app.", comment: "Footer explaining the Pebble smartwatch device"))
+                Text(String(format: LocalizedString("%@ sends glucose readings and glucose alert settings to a Pebble watchface over Bluetooth while the watch is paired with the Pebble app.", comment: "Footer explaining the Pebble smartwatch device (1: app name)"), LupedSmartwatchManager.hostName))
             }
         }
         .insetGroupedListStyle()
@@ -89,7 +89,7 @@ struct LupedWatchSettingsView: View {
                 }
             }
         } message: {
-            Text(LocalizedString("Loop stops sending to the watch and removes the Pebble settings. You can add it again under Devices.", comment: "Delete Pebble confirmation message"))
+            Text(String(format: LocalizedString("%@ stops sending to the watch and removes the Pebble settings. You can add it again under Devices.", comment: "Delete Pebble confirmation message (1: app name)"), LupedSmartwatchManager.hostName))
         }
     }
 }
@@ -107,7 +107,7 @@ struct LupedDiagnosticsView: View {
                     Text(LocalizedString("Communication Log", comment: "Row opening the Pebble communication log"))
                 }
             } footer: {
-                Text(LocalizedString("Everything Loop sends to and receives from the watch since Loop started, newest first. The same lines are kept in Loop's device log for issue reports.", comment: "Footer for the Pebble log section"))
+                Text(String(format: LocalizedString("Everything %1$@ sends to and receives from the watch since %1$@ started, newest first. The same lines are kept in %1$@'s device log for issue reports.", comment: "Footer for the Pebble log section (1: app name)"), LupedSmartwatchManager.hostName))
             }
         }
         .insetGroupedListStyle()
@@ -236,7 +236,7 @@ struct LupedLinkStatusSection: View {
                 .frame(height: 76)
                 .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 6) {
-                Text(LupedWatchManager.localizedTitle)
+                Text(LupedSmartwatchManager.localizedTitle)
                     .font(.title3.bold())
                 HStack(spacing: 6) {
                     statusIcon
@@ -308,7 +308,7 @@ struct LupedWatchInfoSection: View {
         } header: {
             Text(LocalizedString("Watch", comment: "Header for the Pebble watch info section"))
         } footer: {
-            Text(LocalizedString("Reported by the watchface when you tap Refresh Watch Info. After Loop reconnects, the watchface restarts for a moment so it can reply. Counters cover at most the last 48 hours.", comment: "Footer for the Pebble watch info section"))
+            Text(String(format: LocalizedString("Reported by the watchface when you tap Refresh Watch Info. After %@ reconnects, the watchface restarts for a moment so it can reply. Counters cover at most the last 48 hours.", comment: "Footer for the Pebble watch info section (1: app name)"), LupedSmartwatchManager.hostName))
         }
     }
 
