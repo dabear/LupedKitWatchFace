@@ -13,7 +13,7 @@ import LoopKit
 final class LupedSmartwatchManagerTests: XCTestCase {
     private let start = Date(timeIntervalSinceNow: -1_800)
 
-    private func sample(_ mgdl: Double, minutes: Double, trend: GlucoseTrend? = .flat, wasUserEntered: Bool = false) -> SmartwatchGlucoseReading {
+    private func sample(_ mgdl: Double, minutes: Double, trend: SmartwatchGlucoseTrend? = .flat, wasUserEntered: Bool = false) -> SmartwatchGlucoseReading {
         SmartwatchGlucoseReading(
             date: start.addingTimeInterval(minutes * 60),
             milligramsPerDeciliter: mgdl,
@@ -98,50 +98,47 @@ final class LupedSmartwatchManagerTests: XCTestCase {
             sample(110, minutes: 5, trend: .upUp),
         ]
         manager.latestSnapshot = SmartwatchStatusSnapshot(displayUnit: .millimolesPerLiter, glucose: history.last, glucoseHistory: history)
-        manager.latestAlertState = SmartwatchGlucoseAlertState(
-            configuration: .init(urgentLowThreshold: 55, lowThreshold: 70, highThreshold: 180, urgentLowEnabled: true, lowEnabled: true, highEnabled: false, urgentLowRepeatInterval: 300, lowRepeatInterval: nil, highRepeatInterval: 3_600),
-            hostAlertsActive: true,
-            mutedUntil: nil
-        )
 
         let snapshot = try XCTUnwrap(manager.lupedSnapshot())
         XCTAssertEqual(snapshot.unit, .millimolesPerLiter)
         XCTAssertEqual(snapshot.storedSampleCount, 3)
         XCTAssertEqual(snapshot.readings.map(\.milligramsPerDeciliter), [100, 110], "User-entered samples are not CGM readings")
         XCTAssertEqual(snapshot.readings.last?.trend, .singleUp)
-        XCTAssertEqual(snapshot.alerts.configuration?.lowMgDL, 70)
-        XCTAssertNil(snapshot.alerts.configuration?.lowRepeat)
-        XCTAssertTrue(snapshot.alerts.hostAlertsActive)
+        // Thresholds no longer travel to the watch; alerts are host-issued.
+        XCTAssertNil(snapshot.alerts.configuration)
+        XCTAssertFalse(snapshot.alerts.hostAlertsActive)
+    }
+
+    /// A host-issued alert is recorded in the device log (watchface rendering is
+    /// a separate, later piece).
+    func testHostIssuedAlertIsLogged() {
+        let manager = LupedSmartwatchManager(settings: LupedSettings(isEnabled: false))
+        let delegate = MockSmartwatchManagerDelegate()
+        manager.smartwatchManagerDelegate = delegate
+
+        manager.watchAlertDidIssue(SmartwatchAlert(identifier: SmartwatchAlertIdentifier("low"), level: .warning, title: "Low Glucose", body: nil, issuedAt: Date()))
+        XCTAssertEqual(delegate.logEntries.map(\.type), [.connection])
+        XCTAssertTrue(delegate.logEntries.first?.message.contains("Low Glucose") == true)
+
+        delegate.logEntries.removeAll()
+        manager.watchAlertDidRetract(SmartwatchAlertIdentifier("low"))
+        XCTAssertEqual(delegate.logEntries.map(\.type), [.connection])
     }
 }
 
 private final class MockSmartwatchManagerDelegate: SmartwatchManagerDelegate {
-    struct LogEntry {
-        let deviceIdentifier: String?
-        let type: DeviceLogEntryType
-        let message: String
-    }
-
-    var logEntries: [LogEntry] = []
+    var logEntries: [SmartwatchDeviceLogEntry] = []
     var stateUpdates = 0
     var deletions = 0
-
-    func deviceManager(_ manager: DeviceManager, logEventForDeviceIdentifier deviceIdentifier: String?, type: DeviceLogEntryType, message: String, completion: ((Error?) -> Void)?) {
-        logEntries.append(LogEntry(deviceIdentifier: deviceIdentifier, type: type, message: message))
-    }
+    var acknowledgedAlerts: [SmartwatchAlertIdentifier] = []
 
     func smartwatchManagerDidUpdateState(_ manager: SmartwatchManager) { stateUpdates += 1 }
     func smartwatchManagerWantsDeletion(_ manager: SmartwatchManager) async { deletions += 1 }
     func smartwatchManager(_ manager: SmartwatchManager, glucoseSamplesSince start: Date) async throws -> [SmartwatchGlucoseReading] { [] }
     func smartwatchManagerRequestsRefresh(_ manager: SmartwatchManager) {}
+    func smartwatchManager(_ manager: SmartwatchManager, didLogEvent event: SmartwatchDeviceLogEntry) { logEntries.append(event) }
+    func smartwatchManager(_ manager: SmartwatchManager, didAcknowledgeAlert identifier: SmartwatchAlertIdentifier) async { acknowledgedAlerts.append(identifier) }
     func smartwatchManager(_ manager: SmartwatchManager, requestBolus request: SmartwatchBolusRequest) async throws -> Double { throw SmartwatchBolusError.notAllowed }
-
-    func issueAlert(_ alert: Alert) async {}
-    func retractAlert(identifier: Alert.Identifier) async {}
-    func doesIssuedAlertExist(identifier: Alert.Identifier) async throws -> Bool { false }
-    func lookupAllUnretracted(managerIdentifier: String) async throws -> [PersistedAlert] { [] }
-    func lookupAllUnacknowledgedUnretracted(managerIdentifier: String) async throws -> [PersistedAlert] { [] }
-    func recordRetractedAlert(_ alert: Alert, at date: Date) async throws {}
 }
 
 final class LupedSetupProgressTests: XCTestCase {

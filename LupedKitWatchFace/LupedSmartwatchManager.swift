@@ -13,8 +13,9 @@ import LoopKit
 /// LupedKit's direct Bluetooth link.
 ///
 /// The host sends a snapshot as soon as a new reading is stored; it is
-/// forwarded to the watch right away. The watch alarms on its own using the
-/// host's glucose alert settings, so it also receives its alert state and mute.
+/// forwarded to the watch right away. Alerts are host-issued: the host
+/// evaluates its own alerts and forwards them, rather than the watch evaluating
+/// thresholds itself.
 public final class LupedSmartwatchManager: SmartwatchManager {
     public static let pluginIdentifier = "LupedSmartwatchManager"
 
@@ -54,7 +55,6 @@ public final class LupedSmartwatchManager: SmartwatchManager {
     private let lockedSettings: Locked<LupedSettings>
 
     @MainActor var latestSnapshot: SmartwatchStatusSnapshot?
-    @MainActor var latestAlertState: SmartwatchGlucoseAlertState?
     @MainActor var transportIfStarted: LupedTransport?
 
     public init(settings: LupedSettings = LupedSettings(isEnabled: true)) {
@@ -106,12 +106,16 @@ public final class LupedSmartwatchManager: SmartwatchManager {
     }
 
     @MainActor
-    public func glucoseAlertStateDidUpdate(_ state: SmartwatchGlucoseAlertState) {
-        latestAlertState = state
-        // The first snapshot sends the alert state with it.
-        if latestSnapshot != nil {
-            Task { await transport.refresh() }
-        }
+    public func watchAlertDidIssue(_ alert: SmartwatchAlert) {
+        // Host-issued alert. Showing and vibrating it on the watch is pending
+        // watchface work; for now the event is recorded in the device log so the
+        // path is observable end to end.
+        logDeviceCommunication("Host alert issued [\(alert.level)]: \(alert.title ?? "") \(alert.body ?? "")", kind: .info)
+    }
+
+    @MainActor
+    public func watchAlertDidRetract(_ identifier: SmartwatchAlertIdentifier) {
+        logDeviceCommunication("Host alert retracted: \(identifier.value)", kind: .info)
     }
 
     public func delete(completion: @escaping () -> Void) {
@@ -142,19 +146,20 @@ public final class LupedSmartwatchManager: SmartwatchManager {
             readings: readings,
             storedSampleCount: samples.count,
             unit: snapshot.displayUnit == .millimolesPerLiter ? .millimolesPerLiter : .milligramsPerDeciliter,
-            alerts: LupedAlertState(latestAlertState)
+            // Thresholds no longer travel to the watch; alerts are host-issued.
+            alerts: LupedAlertState(configuration: nil, hostAlertsActive: false, hostMuteEnd: nil)
         )
     }
 
     func logDeviceCommunication(_ message: String, kind: LupedCommunicationLog.Kind) {
-        let type: DeviceLogEntryType
+        let type: SmartwatchDeviceLogEntry.EntryType
         switch kind {
         case .toWatch: type = .send
         case .fromWatch: type = .receive
         case .error: type = .error
         case .info: type = .connection
         }
-        smartwatchManagerDelegate?.deviceManager(self, logEventForDeviceIdentifier: settings.watchfaceUUID.uuidString.lowercased(), type: type, message: message, completion: nil)
+        smartwatchManagerDelegate?.smartwatchManager(self, didLogEvent: SmartwatchDeviceLogEntry(type: type, message: message, deviceIdentifier: settings.watchfaceUUID.uuidString.lowercased()))
     }
 }
 
@@ -174,30 +179,23 @@ extension LupedSmartwatchManager {
     }
 }
 
-private extension LupedAlertState {
-    init(_ state: SmartwatchGlucoseAlertState?) {
-        self.init(
-            configuration: state?.configuration.map { configuration in
-                LupedAlertConfiguration(
-                    urgentLowMgDL: configuration.urgentLowThreshold,
-                    lowMgDL: configuration.lowThreshold,
-                    highMgDL: configuration.highThreshold,
-                    urgentLowEnabled: configuration.urgentLowEnabled,
-                    lowEnabled: configuration.lowEnabled,
-                    highEnabled: configuration.highEnabled,
-                    urgentLowRepeat: configuration.urgentLowRepeatInterval,
-                    lowRepeat: configuration.lowRepeatInterval,
-                    highRepeat: configuration.highRepeatInterval
-                )
-            },
-            hostAlertsActive: state?.hostAlertsActive ?? false,
-            hostMuteEnd: state?.mutedUntil
-        )
-    }
+// MARK: - DeviceManager
+
+// Loop places the watch under Settings → Devices and routes its logs and alert
+// responses through the DeviceManager machinery. This conformance is kept out of
+// the core SmartwatchManager protocol so the plugin also builds for hosts (such
+// as Trio) that import it statically without a device seam.
+extension LupedSmartwatchManager: DeviceManager {
+    // Watches don't issue LoopKit alerts. Both AlertResponder forms are defaulted
+    // so the plugin builds against LoopKit variants that declare either one.
+    public func acknowledgeAlert(alertIdentifier: Alert.AlertIdentifier) async throws {}
+    public func acknowledgeAlert(alertIdentifier: Alert.AlertIdentifier, completion: @escaping (Error?) -> Void) { completion(nil) }
+    public func getSoundBaseURL() -> URL? { nil }
+    public func getSounds() -> [Alert.Sound] { [] }
 }
 
 private extension LupedTrend {
-    init(_ trend: GlucoseTrend) {
+    init(_ trend: SmartwatchGlucoseTrend) {
         switch trend {
         case .downDownDown: self = .doubleDown
         case .downDown: self = .singleDown
