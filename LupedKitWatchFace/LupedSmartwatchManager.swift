@@ -161,7 +161,6 @@ public final class LupedSmartwatchManager: SmartwatchManager {
             storedSampleCount: samples.count,
             unit: snapshot.displayUnit == .millimolesPerLiter ? .millimolesPerLiter : .milligramsPerDeciliter,
             // Thresholds no longer travel to the watch; alerts are host-issued.
-            alerts: LupedAlertState(configuration: nil, hostAlertsActive: false, hostMuteEnd: nil),
             hostAlertLevel: hostAlertLevel
         )
     }
@@ -188,7 +187,6 @@ extension LupedSmartwatchManager {
             "* enabled: \(settings.isEnabled)",
             "* watchfaceUUID: \(settings.watchfaceUUID.uuidString.lowercased())",
             "* alarmsEnabled: \(settings.alarmsEnabled)",
-            "* followAlertMute: \(settings.followAlertMute)",
             "* fullScreen: \(settings.fullScreen)",
         ].joined(separator: "\n")
     }

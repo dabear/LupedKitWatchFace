@@ -23,7 +23,7 @@ final class LupedSmartwatchManagerTests: XCTestCase {
     }
 
     func testRawStateRoundTrips() throws {
-        let settings = LupedSettings(isEnabled: true, watchfaceUUID: UUID(), alarmsEnabled: false, followAlertMute: false, fullScreen: true)
+        let settings = LupedSettings(isEnabled: true, watchfaceUUID: UUID(), alarmsEnabled: false, fullScreen: true)
         let manager = LupedSmartwatchManager(settings: settings)
         let restored = try XCTUnwrap(LupedSmartwatchManager(rawState: manager.rawState))
         XCTAssertEqual(restored.settings, settings)

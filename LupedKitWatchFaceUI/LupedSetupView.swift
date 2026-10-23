@@ -105,7 +105,7 @@ struct LupedSetupIntroView: View {
                     EmptyView()
                 } footer: {
                     VStack(alignment: .leading, spacing: 8) {
-                        Text(String(format: LocalizedString("Watch alarms use the thresholds from %@'s glucose alert settings. You can turn them off for the watch alone later.", comment: "Pebble setup note about watch alarms (1: app name)"), LupedSmartwatchManager.hostName))
+                        Text(String(format: LocalizedString("The watch buzzes when %@ raises a glucose alert. You can turn the watch alarms off on their own later.", comment: "Pebble setup note about watch alarms (1: app name)"), LupedSmartwatchManager.hostName))
                         if !LupedSmartwatchManager.hasBluetoothPeripheralBackgroundMode() {
                             Text(String(format: LocalizedString("This build of %1$@ updates the watch only while %1$@ is open. Build it with the bluetooth-peripheral background mode to update the watch in the background.", comment: "Pebble setup warning when the app lacks the bluetooth-peripheral background mode (1: app name)"), LupedSmartwatchManager.hostName))
                                 .foregroundColor(.orange)

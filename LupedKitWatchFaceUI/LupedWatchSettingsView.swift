@@ -46,13 +46,10 @@ struct LupedWatchSettingsView: View {
 
             Section {
                 Toggle(LocalizedString("Watch Alarms", comment: "Toggle enabling Pebble watch vibration alarms"), isOn: $model.settings.alarmsEnabled)
-                if model.settings.alarmsEnabled {
-                    Toggle(String(format: LocalizedString("Follow %@ Alert Mute", comment: "Toggle muting Pebble watch alarms while Loop's alerts are muted (1: app name)"), LupedSmartwatchManager.hostName), isOn: $model.settings.followAlertMute)
-                }
             } header: {
                 Text(LocalizedString("Alarms", comment: "Header for the Pebble alarm settings"))
             } footer: {
-                Text(String(format: LocalizedString("The watch vibrates using the thresholds, on/off switches and repeat intervals from %1$@'s glucose alert settings. Turning Watch Alarms off silences the watch only; %1$@'s alerts are unaffected. With Follow %1$@ Alert Mute, the watch stays silent while %1$@'s alerts are muted and resumes when the mute ends.", comment: "Footer for the Pebble alarm settings (1: app name)"), LupedSmartwatchManager.hostName))
+                Text(String(format: LocalizedString("The watch buzzes when %1$@ raises a glucose alert. While %1$@'s alerts are muted the watch stays silent too, and critical alerts always buzz. Turning Watch Alarms off silences the watch only; %1$@'s own alerts are unaffected.", comment: "Footer for the Pebble alarm settings (1: app name)"), LupedSmartwatchManager.hostName))
             }
 
             Section {
