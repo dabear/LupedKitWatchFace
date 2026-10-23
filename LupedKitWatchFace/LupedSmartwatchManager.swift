@@ -59,14 +59,33 @@ public final class LupedSmartwatchManager: SmartwatchManager {
 
     /// Host-issued alerts currently showing, by identifier. The watch buzzes on
     /// the highest level; the plugin does not evaluate thresholds itself.
-    @MainActor var activeAlerts: [SmartwatchAlertIdentifier: SmartwatchAlertLevel] = [:]
+    @MainActor var activeAlerts: [SmartwatchAlertIdentifier: SmartwatchAlert] = [:]
+
+    /// When this manager started tracking alerts. Alerts the host issued before
+    /// then (for example before a relaunch) are only known once it issues them again.
+    private let alertTrackingStarted = Date()
 
     /// The level the watch sees (DATA index 15): 0 none, 1 info, 2 warning, 3 critical.
     /// Zero while the user has turned watch alarms off, so the watch never buzzes.
     /// Host alert mute is followed on the host side (muted alerts aren't forwarded).
     @MainActor var hostAlertLevel: Int {
         guard settings.alarmsEnabled else { return 0 }
-        return activeAlerts.values.map(\.watchLevel).max() ?? 0
+        return activeAlerts.values.map(\.level.watchLevel).max() ?? 0
+    }
+
+    /// Why `hostAlertLevel` is what it is, for the communication log.
+    @MainActor var hostAlertReason: String {
+        guard settings.alarmsEnabled else {
+            return "Watch Alarms is turned off"
+        }
+        guard !activeAlerts.isEmpty else {
+            let since = DateFormatter.localizedString(from: alertTrackingStarted, dateStyle: .none, timeStyle: .short)
+            return "no active alerts from \(Self.hostName) since \(since); muted alerts aren't sent"
+        }
+        return activeAlerts.values
+            .sorted { $0.level.watchLevel > $1.level.watchLevel }
+            .map { $0.title ?? $0.identifier.value }
+            .joined(separator: ", ")
     }
 
     public init(settings: LupedSettings = LupedSettings(isEnabled: true)) {
@@ -119,7 +138,7 @@ public final class LupedSmartwatchManager: SmartwatchManager {
 
     @MainActor
     public func watchAlertDidIssue(_ alert: SmartwatchAlert) {
-        activeAlerts[alert.identifier] = alert.level
+        activeAlerts[alert.identifier] = alert
         logDeviceCommunication("Host alert issued [\(alert.level)]: \(alert.title ?? "") \(alert.body ?? "")", kind: .info)
         // Resend the snapshot so the watch sees the new alert level and buzzes.
         Task { await transport.refresh() }
@@ -161,7 +180,8 @@ public final class LupedSmartwatchManager: SmartwatchManager {
             storedSampleCount: samples.count,
             unit: snapshot.displayUnit == .millimolesPerLiter ? .millimolesPerLiter : .milligramsPerDeciliter,
             // Thresholds no longer travel to the watch; alerts are host-issued.
-            hostAlertLevel: hostAlertLevel
+            hostAlertLevel: hostAlertLevel,
+            hostAlertReason: hostAlertReason
         )
     }
 
