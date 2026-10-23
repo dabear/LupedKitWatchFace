@@ -65,7 +65,7 @@ public final class LupedSmartwatchManager: SmartwatchManager {
     /// then (for example before a relaunch) are only known once it issues them again.
     private let alertTrackingStarted = Date()
 
-    /// The level the watch sees (DATA index 15): 0 none, 1 info, 2 warning, 3 critical.
+    /// The level the watch sees (DATA index 8): 0 none, 1 info, 2 warning, 3 critical.
     /// Zero while the user has turned watch alarms off, so the watch never buzzes.
     /// Host alert mute is followed on the host side (muted alerts aren't forwarded).
     @MainActor var hostAlertLevel: Int {
@@ -228,7 +228,7 @@ extension LupedSmartwatchManager: DeviceManager {
 }
 
 private extension SmartwatchAlertLevel {
-    /// Luped DATA index 15 value: 1 info, 2 warning, 3 critical.
+    /// Luped DATA index 8 value: 1 info, 2 warning, 3 critical.
     var watchLevel: Int {
         switch self {
         case .informational: return 1
