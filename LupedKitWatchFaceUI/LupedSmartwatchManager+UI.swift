@@ -11,7 +11,7 @@ import LupedKitWatchFace
 import SwiftUI
 import UIKit
 
-extension LupedSmartwatchManager: SmartwatchManagerUI {
+extension LupedSmartwatchManager: @retroactive SmartwatchManagerUI {
     public static var onboardingImage: UIImage? {
         PebbleArtwork.image
     }

@@ -96,7 +96,7 @@ public final class LupedSmartwatchManager: SmartwatchManager {
             self?.logDeviceCommunication(message, kind: kind)
         }
         transport.snapshotProvider = { [weak self] in
-            await self?.lupedSnapshot()
+            self?.lupedSnapshot()
         }
         transportIfStarted = transport
         transport.start()
