@@ -57,6 +57,18 @@ public final class LupedSmartwatchManager: SmartwatchManager {
     @MainActor var latestSnapshot: SmartwatchStatusSnapshot?
     @MainActor var transportIfStarted: LupedTransport?
 
+    /// Host-issued alerts currently showing, by identifier. The watch buzzes on
+    /// the highest level; the plugin does not evaluate thresholds itself.
+    @MainActor var activeAlerts: [SmartwatchAlertIdentifier: SmartwatchAlertLevel] = [:]
+
+    /// The level the watch sees (DATA index 15): 0 none, 1 info, 2 warning, 3 critical.
+    /// Zero while the user has turned watch alarms off, so the watch never buzzes.
+    /// Host alert mute is followed on the host side (muted alerts aren't forwarded).
+    @MainActor var hostAlertLevel: Int {
+        guard settings.alarmsEnabled else { return 0 }
+        return activeAlerts.values.map(\.watchLevel).max() ?? 0
+    }
+
     public init(settings: LupedSettings = LupedSettings(isEnabled: true)) {
         lockedSettings = Locked(settings)
     }
@@ -107,15 +119,17 @@ public final class LupedSmartwatchManager: SmartwatchManager {
 
     @MainActor
     public func watchAlertDidIssue(_ alert: SmartwatchAlert) {
-        // Host-issued alert. Showing and vibrating it on the watch is pending
-        // watchface work; for now the event is recorded in the device log so the
-        // path is observable end to end.
+        activeAlerts[alert.identifier] = alert.level
         logDeviceCommunication("Host alert issued [\(alert.level)]: \(alert.title ?? "") \(alert.body ?? "")", kind: .info)
+        // Resend the snapshot so the watch sees the new alert level and buzzes.
+        Task { await transport.refresh() }
     }
 
     @MainActor
     public func watchAlertDidRetract(_ identifier: SmartwatchAlertIdentifier) {
+        guard activeAlerts.removeValue(forKey: identifier) != nil else { return }
         logDeviceCommunication("Host alert retracted: \(identifier.value)", kind: .info)
+        Task { await transport.refresh() }
     }
 
     public func delete(completion: @escaping () -> Void) {
@@ -147,7 +161,8 @@ public final class LupedSmartwatchManager: SmartwatchManager {
             storedSampleCount: samples.count,
             unit: snapshot.displayUnit == .millimolesPerLiter ? .millimolesPerLiter : .milligramsPerDeciliter,
             // Thresholds no longer travel to the watch; alerts are host-issued.
-            alerts: LupedAlertState(configuration: nil, hostAlertsActive: false, hostMuteEnd: nil)
+            alerts: LupedAlertState(configuration: nil, hostAlertsActive: false, hostMuteEnd: nil),
+            hostAlertLevel: hostAlertLevel
         )
     }
 
@@ -192,6 +207,17 @@ extension LupedSmartwatchManager: DeviceManager {
     public func acknowledgeAlert(alertIdentifier: Alert.AlertIdentifier, completion: @escaping (Error?) -> Void) { completion(nil) }
     public func getSoundBaseURL() -> URL? { nil }
     public func getSounds() -> [Alert.Sound] { [] }
+}
+
+private extension SmartwatchAlertLevel {
+    /// Luped DATA index 15 value: 1 info, 2 warning, 3 critical.
+    var watchLevel: Int {
+        switch self {
+        case .informational: return 1
+        case .warning: return 2
+        case .critical: return 3
+        }
+    }
 }
 
 private extension LupedTrend {

@@ -109,20 +109,33 @@ final class LupedSmartwatchManagerTests: XCTestCase {
         XCTAssertFalse(snapshot.alerts.hostAlertsActive)
     }
 
-    /// A host-issued alert is recorded in the device log (watchface rendering is
-    /// a separate, later piece).
-    func testHostIssuedAlertIsLogged() {
-        let manager = LupedSmartwatchManager(settings: LupedSettings(isEnabled: false))
+    /// A host-issued alert raises the level the watch sees (DATA index 15), the
+    /// highest active alert wins, and retracting falls back; each is logged.
+    func testHostIssuedAlertSetsLevel() {
+        let manager = LupedSmartwatchManager(settings: LupedSettings(isEnabled: true))
         let delegate = MockSmartwatchManagerDelegate()
         manager.smartwatchManagerDelegate = delegate
+        XCTAssertEqual(manager.hostAlertLevel, 0)
 
         manager.watchAlertDidIssue(SmartwatchAlert(identifier: SmartwatchAlertIdentifier("low"), level: .warning, title: "Low Glucose", body: nil, issuedAt: Date()))
-        XCTAssertEqual(delegate.logEntries.map(\.type), [.connection])
-        XCTAssertTrue(delegate.logEntries.first?.message.contains("Low Glucose") == true)
+        XCTAssertEqual(manager.hostAlertLevel, 2, "Warning maps to level 2")
+        XCTAssertTrue(delegate.logEntries.contains { $0.type == .connection && $0.message.contains("Low Glucose") })
 
-        delegate.logEntries.removeAll()
+        manager.watchAlertDidIssue(SmartwatchAlert(identifier: SmartwatchAlertIdentifier("pump"), level: .critical, title: "Pump", body: nil, issuedAt: Date()))
+        XCTAssertEqual(manager.hostAlertLevel, 3, "The highest active alert wins")
+        manager.watchAlertDidRetract(SmartwatchAlertIdentifier("pump"))
+        XCTAssertEqual(manager.hostAlertLevel, 2, "Falls back to the remaining alert")
         manager.watchAlertDidRetract(SmartwatchAlertIdentifier("low"))
-        XCTAssertEqual(delegate.logEntries.map(\.type), [.connection])
+        XCTAssertEqual(manager.hostAlertLevel, 0)
+    }
+
+    /// Turning watch alarms off keeps the level at 0 so the watch never buzzes,
+    /// whatever the host forwards.
+    func testWatchAlarmsOffSuppressesHostAlertLevel() {
+        let manager = LupedSmartwatchManager(settings: LupedSettings(isEnabled: true, alarmsEnabled: false))
+        manager.smartwatchManagerDelegate = MockSmartwatchManagerDelegate()
+        manager.watchAlertDidIssue(SmartwatchAlert(identifier: SmartwatchAlertIdentifier("low"), level: .critical, title: nil, body: nil, issuedAt: Date()))
+        XCTAssertEqual(manager.hostAlertLevel, 0)
     }
 }
 
