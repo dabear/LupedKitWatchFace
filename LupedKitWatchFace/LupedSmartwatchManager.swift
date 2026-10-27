@@ -162,7 +162,7 @@ public final class LupedSmartwatchManager: SmartwatchManager {
         transportIfStarted = transport
         transport.start()
         if !Self.hasBluetoothPeripheralBackgroundMode() {
-            logDeviceCommunication("\(Self.hostName) was built without the bluetooth-peripheral background mode: the watch only updates while \(Self.hostName) is in the foreground", kind: .error)
+            logNote("\(Self.hostName) was built without the bluetooth-peripheral background mode: the watch only updates while \(Self.hostName) is in the foreground", kind: .error)
         }
         return transport
     }
@@ -184,7 +184,7 @@ public final class LupedSmartwatchManager: SmartwatchManager {
         // Every fire (first or repeat) is a new event for the watch to buzz on.
         lockedAlertEvent.value = (lockedAlertEvent.value + 1) % Self.alertEventModulus
         smartwatchManagerDelegate?.smartwatchManagerDidUpdateState(self)
-        logDeviceCommunication("Host alert issued [\(alert.level)], event \(alertEvent): \(alert.title ?? "") \(alert.body ?? "")", kind: .info)
+        logNote("Host alert issued [\(alert.level)], event \(alertEvent): \(alert.title ?? "") \(alert.body ?? "")", kind: .info)
         // Resend the snapshot so the watch sees the new alert level/event and buzzes.
         Task { await transport.refresh() }
     }
@@ -192,8 +192,15 @@ public final class LupedSmartwatchManager: SmartwatchManager {
     @MainActor
     public func watchAlertDidRetract(_ identifier: SmartwatchAlertIdentifier) {
         guard activeAlerts.removeValue(forKey: identifier) != nil else { return }
-        logDeviceCommunication("Host alert retracted: \(identifier.value)", kind: .info)
+        logNote("Host alert retracted: \(identifier.value)", kind: .info)
         Task { await transport.refresh() }
+    }
+
+    /// Shows the host's alert notes (why an alert wasn't sent, when it repeats)
+    /// next to the watch traffic. The host already wrote them to its device log.
+    @MainActor
+    public func watchHostDidLog(_ message: String) {
+        transport.communicationLog.append(.info, "\(Self.hostName): \(message)")
     }
 
     public func delete(completion: @escaping () -> Void) {
@@ -229,6 +236,14 @@ public final class LupedSmartwatchManager: SmartwatchManager {
             hostAlertReason: hostAlertReason,
             alertEvent: alertEvent
         )
+    }
+
+    /// A note of the plugin's own, for the in-app communication log and the host's
+    /// device log. Transport lines reach the in-app log through the transport.
+    @MainActor
+    func logNote(_ message: String, kind: LupedCommunicationLog.Kind) {
+        transport.communicationLog.append(kind, message)
+        logDeviceCommunication(message, kind: kind)
     }
 
     func logDeviceCommunication(_ message: String, kind: LupedCommunicationLog.Kind) {
