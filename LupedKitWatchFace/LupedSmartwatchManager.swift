@@ -54,6 +54,16 @@ public final class LupedSmartwatchManager: SmartwatchManager {
     }
     private let lockedSettings: Locked<LupedSettings>
 
+    /// The watch's alert event (DATA index 9): advanced on every host alert fire,
+    /// including repeats of an alert that is still active, so the watch buzzes in
+    /// step with the host even when the level doesn't change. Advanced whether or
+    /// not watch alarms are on, so re-enabling them doesn't replay an old fire.
+    /// Saved in `rawState` so a relaunch can't land on the value the watch last saw.
+    var alertEvent: Int { lockedAlertEvent.value }
+    private let lockedAlertEvent: Locked<Int>
+    /// The alert event wraps here; the watch compares for inequality.
+    static let alertEventModulus = 1000
+
     @MainActor var latestSnapshot: SmartwatchStatusSnapshot?
     @MainActor var transportIfStarted: LupedTransport?
 
@@ -90,14 +100,16 @@ public final class LupedSmartwatchManager: SmartwatchManager {
 
     public init(settings: LupedSettings = LupedSettings(isEnabled: true)) {
         lockedSettings = Locked(settings)
+        lockedAlertEvent = Locked(0)
     }
 
     public init?(rawState: RawStateValue) {
         lockedSettings = Locked(LupedSettings(rawValue: rawState["settings"] as? LupedSettings.RawValue ?? [:]))
+        lockedAlertEvent = Locked((rawState["alertEvent"] as? Int ?? 0) % Self.alertEventModulus)
     }
 
     public var rawState: RawStateValue {
-        ["settings": settings.rawValue]
+        ["settings": settings.rawValue, "alertEvent": alertEvent]
     }
 
     public var isOnboarded: Bool { true }
@@ -139,8 +151,11 @@ public final class LupedSmartwatchManager: SmartwatchManager {
     @MainActor
     public func watchAlertDidIssue(_ alert: SmartwatchAlert) {
         activeAlerts[alert.identifier] = alert
-        logDeviceCommunication("Host alert issued [\(alert.level)]: \(alert.title ?? "") \(alert.body ?? "")", kind: .info)
-        // Resend the snapshot so the watch sees the new alert level and buzzes.
+        // Every fire (first or repeat) is a new event for the watch to buzz on.
+        lockedAlertEvent.value = (lockedAlertEvent.value + 1) % Self.alertEventModulus
+        smartwatchManagerDelegate?.smartwatchManagerDidUpdateState(self)
+        logDeviceCommunication("Host alert issued [\(alert.level)], event \(alertEvent): \(alert.title ?? "") \(alert.body ?? "")", kind: .info)
+        // Resend the snapshot so the watch sees the new alert level/event and buzzes.
         Task { await transport.refresh() }
     }
 
@@ -179,9 +194,10 @@ public final class LupedSmartwatchManager: SmartwatchManager {
             readings: readings,
             storedSampleCount: samples.count,
             unit: snapshot.displayUnit == .millimolesPerLiter ? .millimolesPerLiter : .milligramsPerDeciliter,
-            // Thresholds no longer travel to the watch; alerts are host-issued.
+            // Thresholds don't travel to the watch; alerts are host-issued.
             hostAlertLevel: hostAlertLevel,
-            hostAlertReason: hostAlertReason
+            hostAlertReason: hostAlertReason,
+            alertEvent: alertEvent
         )
     }
 
