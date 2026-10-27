@@ -169,6 +169,24 @@ final class LupedSmartwatchManagerTests: XCTestCase {
         XCTAssertEqual(manager.hostAlertLevel, 0)
     }
 
+    /// The last watch diagnostics report is saved with the state, so the watch
+    /// info shows after a relaunch instead of waiting for the next hourly report.
+    func testWatchDiagnosticsSurviveRelaunch() throws {
+        let manager = LupedSmartwatchManager(settings: LupedSettings(isEnabled: false))
+        let delegate = MockSmartwatchManagerDelegate()
+        manager.smartwatchManagerDelegate = delegate
+        let json = "[2,1792957000000,85,1792950000000,1,0,0,0,0,0,0,0,0,12,3]"
+        let receivedAt = Date(timeIntervalSince1970: 1_792_957_000)
+        manager.transport.diagnosticsDidArrive?(json, receivedAt)
+        XCTAssertEqual(delegate.stateUpdates, 1, "A new report saves the state")
+
+        let restored = try XCTUnwrap(LupedSmartwatchManager(rawState: manager.rawState))
+        XCTAssertEqual(restored.savedDiagnostics, .init(json: json, receivedAt: receivedAt))
+        let shown = try XCTUnwrap(restored.transport.status.diagnostics, "Shown as soon as the link starts")
+        XCTAssertEqual(shown.battery, 85)
+        XCTAssertEqual(shown.receivedAt, receivedAt)
+    }
+
     func testAlertEventWraps() throws {
         let manager = try XCTUnwrap(LupedSmartwatchManager(rawState: ["alertEvent": LupedSmartwatchManager.alertEventModulus - 1]))
         manager.smartwatchManagerDelegate = MockSmartwatchManagerDelegate()

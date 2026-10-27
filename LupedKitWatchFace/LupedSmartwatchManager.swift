@@ -64,6 +64,16 @@ public final class LupedSmartwatchManager: SmartwatchManager {
     /// The alert event wraps here; the watch compares for inequality.
     static let alertEventModulus = 1000
 
+    /// The watch's last diagnostics report. The watchface reports about once an
+    /// hour; saving the report in `rawState` lets the watch info show right after a
+    /// relaunch instead of waiting up to an hour for the next one.
+    struct SavedDiagnostics: Equatable {
+        var json: String
+        var receivedAt: Date
+    }
+    var savedDiagnostics: SavedDiagnostics? { lockedDiagnostics.value }
+    private let lockedDiagnostics: Locked<SavedDiagnostics?>
+
     @MainActor var latestSnapshot: SmartwatchStatusSnapshot?
     @MainActor var transportIfStarted: LupedTransport?
 
@@ -101,15 +111,27 @@ public final class LupedSmartwatchManager: SmartwatchManager {
     public init(settings: LupedSettings = LupedSettings(isEnabled: true)) {
         lockedSettings = Locked(settings)
         lockedAlertEvent = Locked(0)
+        lockedDiagnostics = Locked(nil)
     }
 
     public init?(rawState: RawStateValue) {
         lockedSettings = Locked(LupedSettings(rawValue: rawState["settings"] as? LupedSettings.RawValue ?? [:]))
         lockedAlertEvent = Locked((rawState["alertEvent"] as? Int ?? 0) % Self.alertEventModulus)
+        if let json = rawState["watchDiagnostics"] as? String,
+           let receivedAt = rawState["watchDiagnosticsReceivedAt"] as? TimeInterval {
+            lockedDiagnostics = Locked(SavedDiagnostics(json: json, receivedAt: Date(timeIntervalSince1970: receivedAt)))
+        } else {
+            lockedDiagnostics = Locked(nil)
+        }
     }
 
     public var rawState: RawStateValue {
-        ["settings": settings.rawValue, "alertEvent": alertEvent]
+        var state: RawStateValue = ["settings": settings.rawValue, "alertEvent": alertEvent]
+        if let saved = savedDiagnostics {
+            state["watchDiagnostics"] = saved.json
+            state["watchDiagnosticsReceivedAt"] = saved.receivedAt.timeIntervalSince1970
+        }
+        return state
     }
 
     public var isOnboarded: Bool { true }
@@ -128,6 +150,14 @@ public final class LupedSmartwatchManager: SmartwatchManager {
         }
         transport.snapshotProvider = { [weak self] in
             self?.lupedSnapshot()
+        }
+        transport.diagnosticsDidArrive = { [weak self] json, receivedAt in
+            guard let self else { return }
+            self.lockedDiagnostics.value = SavedDiagnostics(json: json, receivedAt: receivedAt)
+            self.smartwatchManagerDelegate?.smartwatchManagerDidUpdateState(self)
+        }
+        if let saved = savedDiagnostics {
+            transport.restoreDiagnostics(json: saved.json, receivedAt: saved.receivedAt)
         }
         transportIfStarted = transport
         transport.start()

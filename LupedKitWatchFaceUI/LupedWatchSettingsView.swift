@@ -288,9 +288,9 @@ struct LupedWatchInfoSection: View {
                 row(LocalizedString("Stale data events", comment: "Pebble watch info: stale transitions"), info.staleTransitions.map(String.init))
                 row(LocalizedString("Phone disconnects", comment: "Pebble watch info: disconnects and total time"), disconnects(info))
                 row(LocalizedString("Counting since", comment: "Pebble watch info: diagnostics window start"), info.countingSince.map { DateFormatter.localizedString(from: $0, dateStyle: .short, timeStyle: .short) })
-                row(LocalizedString("Updated", comment: "Pebble watch info: time the snapshot arrived"), DateFormatter.localizedString(from: info.receivedAt, dateStyle: .none, timeStyle: .medium))
+                row(LocalizedString("Updated", comment: "Pebble watch info: time the snapshot arrived"), updatedText(info.receivedAt))
             } else {
-                Text(LocalizedString("No watch info yet.", comment: "Shown before the Pebble watch has sent diagnostics"))
+                Text(LocalizedString("The watch sends its battery and counters about once an hour.", comment: "Shown before the Pebble watch has sent its first diagnostics report"))
                     .foregroundColor(.secondary)
             }
             if let note = status.watchInfoNote {
@@ -305,8 +305,18 @@ struct LupedWatchInfoSection: View {
         } header: {
             Text(LocalizedString("Watch", comment: "Header for the Pebble watch info section"))
         } footer: {
-            Text(String(format: LocalizedString("Reported by the watchface when you tap Refresh Watch Info. After %@ reconnects, the watchface restarts for a moment so it can reply. Counters cover at most the last 48 hours.", comment: "Footer for the Pebble watch info section (1: app name)"), LupedSmartwatchManager.hostName))
+            Text(String(format: LocalizedString("The watchface reports this about once an hour, and again when you open this screen if it can answer right away. Refresh Watch Info asks now; after %@ reconnects, the watchface restarts for a moment so it can reply. Counters cover at most the last 48 hours.", comment: "Footer for the Pebble watch info section (1: app name)"), LupedSmartwatchManager.hostName))
         }
+        .onAppear {
+            // Fresh numbers without a tap, but never at the cost of restarting the watchface.
+            transport.requestDiagnosticsIfReachable()
+        }
+    }
+
+    private func updatedText(_ date: Date) -> String {
+        Calendar.current.isDateInToday(date)
+            ? DateFormatter.localizedString(from: date, dateStyle: .none, timeStyle: .short)
+            : DateFormatter.localizedString(from: date, dateStyle: .short, timeStyle: .short)
     }
 
     @ViewBuilder
