@@ -49,7 +49,7 @@ struct LupedWatchSettingsView: View {
             } header: {
                 Text(LocalizedString("Alarms", comment: "Header for the Pebble alarm settings"))
             } footer: {
-                Text(String(format: LocalizedString("The watch buzzes when %1$@ raises a glucose alert. While %1$@'s alerts are muted the watch stays silent too, and critical alerts always buzz. Turning Watch Alarms off silences the watch only; %1$@'s own alerts are unaffected.", comment: "Footer for the Pebble alarm settings (1: app name)"), LupedSmartwatchManager.hostName))
+                Text(String(format: LocalizedString("The watch buzzes when %1$@ raises a glucose alert, and again each time %1$@ repeats it. While %1$@'s alerts are muted the watch stays silent too, critical alerts included. Turning Watch Alarms off silences the watch only; %1$@'s own alerts are unaffected.", comment: "Footer for the Pebble alarm settings (1: app name)"), LupedSmartwatchManager.hostName))
             }
 
             Section {
@@ -69,7 +69,7 @@ struct LupedWatchSettingsView: View {
                         .foregroundColor(.red)
                 }
             } footer: {
-                Text(String(format: LocalizedString("%@ sends glucose readings and glucose alert settings to a Pebble watchface over Bluetooth while the watch is paired with the Pebble app.", comment: "Footer explaining the Pebble smartwatch device (1: app name)"), LupedSmartwatchManager.hostName))
+                Text(String(format: LocalizedString("%@ sends glucose readings and its glucose alerts to a Pebble watchface over Bluetooth while the watch is paired with the Pebble app.", comment: "Footer explaining the Pebble smartwatch device (1: app name)"), LupedSmartwatchManager.hostName))
             }
         }
         .insetGroupedListStyle()
@@ -261,7 +261,7 @@ struct LupedLinkStatusSection: View {
             Button(LocalizedString("Send Now", comment: "Button pushing the current reading to the Pebble watch")) {
                 transport.sendNow()
             }
-            .disabled(status.link == .off)
+            .disabled(status.link == .off || status.link == .bluetoothUnavailable)
             if let result = status.lastResult {
                 Text(result)
                     .font(.footnote)
@@ -284,7 +284,6 @@ struct LupedWatchInfoSection: View {
                 row(LocalizedString("Battery", comment: "Pebble watch info: battery"), info.battery.map { "\($0)%" })
                 row(LocalizedString("Readings received", comment: "Pebble watch info: DATA messages received"), info.readingsReceived.map(String.init))
                 row(LocalizedString("Refresh requests", comment: "Pebble watch info: refresh requests sent"), info.refreshRequests.map(String.init))
-                row(LocalizedString("Alarms (urgent low / low / high)", comment: "Pebble watch info: alarm counts"), alarmCounts(info))
                 row(LocalizedString("Stale data events", comment: "Pebble watch info: stale transitions"), info.staleTransitions.map(String.init))
                 row(LocalizedString("Phone disconnects", comment: "Pebble watch info: disconnects and total time"), disconnects(info))
                 row(LocalizedString("Counting since", comment: "Pebble watch info: diagnostics window start"), info.countingSince.map { DateFormatter.localizedString(from: $0, dateStyle: .short, timeStyle: .short) })
@@ -326,11 +325,6 @@ struct LupedWatchInfoSection: View {
         }
     }
 
-    private func alarmCounts(_ info: LupedWatchDiagnostics) -> String? {
-        guard let urgentLow = info.urgentLowAlarms, let low = info.lowAlarms, let high = info.highAlarms else { return nil }
-        return "\(urgentLow) / \(low) / \(high)"
-    }
-
     private func disconnects(_ info: LupedWatchDiagnostics) -> String? {
         guard let count = info.phoneDisconnects else { return nil }
         let seconds = info.phoneDisconnectedSeconds ?? 0
@@ -369,10 +363,14 @@ struct LupedCommunicationLogView: View {
                             .font(.caption.monospaced().weight(.semibold))
                             .textSelection(.enabled)
                         if lines.count > 1 {
-                            Text(String(lines[1]))
-                                .font(.caption2.monospaced())
-                                .foregroundColor(.secondary)
-                                .textSelection(.enabled)
+                            VStack(alignment: .leading, spacing: 0) {
+                                ForEach(Array(lines[1].split(separator: "\n", omittingEmptySubsequences: false).enumerated()), id: \.offset) { _, line in
+                                    LupedLogDetailLine(line: String(line))
+                                }
+                            }
+                            .font(.caption2.monospaced())
+                            .foregroundColor(.secondary)
+                            .textSelection(.enabled)
                         }
                     }
                 }
@@ -380,6 +378,7 @@ struct LupedCommunicationLogView: View {
         }
         .insetGroupedListStyle()
         .navigationTitle(LocalizedString("Communication Log", comment: "Title of the Pebble communication log"))
+        .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItemGroup(placement: .navigationBarTrailing) {
                 ShareLink(item: log.text)
@@ -410,5 +409,46 @@ struct LupedCommunicationLogView: View {
         case .info: return .secondary
         case .error: return .red
         }
+    }
+}
+
+/// One detail line of a log entry. Aligned rows (`  label  value` and
+/// `   0:  value  description`) keep their last column in a hanging indent, so a
+/// line that wraps on a narrow screen stays in its column instead of running
+/// back under the index.
+struct LupedLogDetailLine: View {
+    let line: String
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+
+    var body: some View {
+        if let (lead, last) = Self.columns(line) {
+            if dynamicTypeSize.isAccessibilitySize {
+                VStack(alignment: .leading, spacing: 0) {
+                    Text(lead)
+                    Text(last).padding(.leading, 24)
+                }
+            } else {
+                HStack(alignment: .firstTextBaseline, spacing: 0) {
+                    Text(lead).fixedSize()
+                    Text(last).frame(maxWidth: .infinity, alignment: .leading)
+                }
+            }
+        } else {
+            Text(line)
+        }
+    }
+
+    private static let gap = try! NSRegularExpression(pattern: "\\S( {2,})(?=\\S)")
+
+    /// Splits at the last gap of two or more spaces between columns; nil for
+    /// lines without columns, such as `raw [`.
+    static func columns(_ line: String) -> (String, String)? {
+        let range = NSRange(line.startIndex..., in: line)
+        guard let match = gap.matches(in: line, range: range).last,
+              let cut = Range(match.range(at: 1), in: line)?.upperBound
+        else {
+            return nil
+        }
+        return (String(line[..<cut]), String(line[cut...]))
     }
 }

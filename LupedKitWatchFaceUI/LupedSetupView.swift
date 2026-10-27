@@ -81,7 +81,7 @@ struct LupedSetupIntroView: View {
                             .scaledToFit()
                             .frame(height: 110)
                             .accessibilityHidden(true)
-                        Text(String(format: LocalizedString("%@ sends each new glucose reading to your Pebble as soon as it arrives, and the watch vibrates for lows and highs.", comment: "Pebble setup introduction (1: app name)"), LupedSmartwatchManager.hostName))
+                        Text(String(format: LocalizedString("%1$@ sends each new glucose reading to your Pebble as soon as it arrives, and the watch vibrates when %1$@ raises a glucose alert.", comment: "Pebble setup introduction (1: app name)"), LupedSmartwatchManager.hostName))
                             .multilineTextAlignment(.center)
                     }
                     .frame(maxWidth: .infinity)

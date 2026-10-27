@@ -54,10 +54,17 @@ enum PebbleArtwork {
                 UIBezierPath(roundedRect: rect, cornerRadius: radius).fill()
             }
 
-            // Strap ends above and below the case.
+            // Strap ends above and below the case, with a lighter edge so they
+            // still show on a dark background.
             let strap = UIColor(white: 0.17, alpha: 1)
-            roundedRect(CGRect(x: w * 0.25, y: 0, width: w * 0.5, height: h * 0.3), w * 0.06, fill: strap)
-            roundedRect(CGRect(x: w * 0.25, y: h * 0.7, width: w * 0.5, height: h * 0.3), w * 0.06, fill: strap)
+            let strapEdge = UIColor(white: 0.42, alpha: 1)
+            for rect in [CGRect(x: w * 0.25, y: 0, width: w * 0.5, height: h * 0.3), CGRect(x: w * 0.25, y: h * 0.7, width: w * 0.5, height: h * 0.3)] {
+                roundedRect(rect, w * 0.06, fill: strap)
+                strapEdge.setStroke()
+                let edge = UIBezierPath(roundedRect: rect.insetBy(dx: 0.75, dy: 0.75), cornerRadius: w * 0.06)
+                edge.lineWidth = 1.5
+                edge.stroke()
+            }
 
             // Buttons: back on the left, up/select/down on the right.
             let button = UIColor(white: 0.62, alpha: 1)
