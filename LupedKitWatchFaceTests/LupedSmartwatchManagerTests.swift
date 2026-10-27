@@ -129,6 +129,25 @@ final class LupedSmartwatchManagerTests: XCTestCase {
         XCTAssertEqual(snapshot.alertEvent, 0)
     }
 
+    /// Loop status, therapy context and URLs are optional: Luped declares none of
+    /// them, ignores therapy a host sends anyway, and handles no URL.
+    func testOptionalHostFeaturesStayOff() throws {
+        XCTAssertEqual(LupedSmartwatchManager.capabilities, [.glucose, .history, .alerts])
+        let manager = LupedSmartwatchManager(settings: LupedSettings(isEnabled: false))
+        let reading = sample(120, minutes: 5)
+        manager.latestSnapshot = SmartwatchStatusSnapshot(displayUnit: .milligramsPerDeciliter, glucose: reading, glucoseHistory: [reading])
+        let plain = try XCTUnwrap(manager.lupedSnapshot())
+        manager.latestSnapshot = SmartwatchStatusSnapshot(
+            displayUnit: .milligramsPerDeciliter, glucose: reading, glucoseHistory: [reading],
+            insulinOnBoard: 1.2, carbsOnBoard: 15,
+            therapy: SmartwatchTherapyContext(tempBasalRate: 0.4, insulinSensitivity: 45, correctionRange: 100...110, activePresetName: "Exercise")
+        )
+        let withExtras = try XCTUnwrap(manager.lupedSnapshot())
+        XCTAssertEqual(withExtras.readings, plain.readings)
+        XCTAssertEqual(withExtras.unit, plain.unit)
+        XCTAssertFalse(manager.watchHostDidReceiveURL(URL(string: "trio://smartwatch/callback")!))
+    }
+
     /// A host-issued alert raises the level the watch sees (DATA index 8), the
     /// highest active alert wins, and retracting falls back; each is logged.
     func testHostIssuedAlertSetsLevel() {
