@@ -344,7 +344,7 @@ struct LupedWatchInfoSection: View {
         } header: {
             Text(LocalizedString("Watch", comment: "Header for the Pebble watch info section"))
         } footer: {
-            Text(String(format: LocalizedString("The watchface reports this about once an hour. Refresh Watch Info asks now; after %@ reconnects, the watchface restarts for a moment so it can reply. Counters cover at most the last 48 hours.", comment: "Footer for the Pebble watch info section (1: app name)"), LupedSmartwatchManager.hostName))
+            Text(String(format: LocalizedString("The watchface reports this about once an hour. Refresh Watch Info asks now; right after %@ reconnects, the reply can take up to half a minute. Counters cover at most the last 48 hours.", comment: "Footer for the Pebble watch info section (1: app name)"), LupedSmartwatchManager.hostName))
         }
     }
 
