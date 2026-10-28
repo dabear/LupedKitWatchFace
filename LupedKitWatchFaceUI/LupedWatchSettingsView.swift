@@ -54,7 +54,7 @@ struct LupedWatchSettingsView: View {
                     }
                 }
             } footer: {
-                Text(String(format: LocalizedString("The black line under the glucose ring. IOB and COB dim when %1$@ hasn't looped for 16 minutes. Not shown with the full-screen ring.", comment: "Footer for the Pebble status line picker (1: app name)"), LupedSmartwatchManager.hostName))
+                Text(String(format: LocalizedString("The black line under the glucose ring. It dims when %1$@ hasn't looped for 16 minutes. With None, the line and the loop ring stay empty, and %1$@ sends no loop or therapy values to the watch. Not shown with the full-screen ring.", comment: "Footer for the Pebble status line picker (1: app name)"), LupedSmartwatchManager.hostName))
             }
 
             Section {
@@ -492,6 +492,7 @@ extension LupedStatusLine {
     /// The name shown in the Status Line picker.
     var title: String {
         switch self {
+        case .none: LocalizedString("None", comment: "Pebble status line choice: nothing on the status line and no loop ring")
         case .iobAndCob: LocalizedString("IOB & COB", comment: "Pebble status line choice: insulin and carbs on board")
         case .tempBasal: LocalizedString("Temp Basal", comment: "Pebble status line choice: current temp or scheduled basal rate")
         case .eventualGlucose: LocalizedString("Eventual Glucose", comment: "Pebble status line choice: predicted eventual glucose")

@@ -35,6 +35,17 @@ public final class LupedSmartwatchManager: SmartwatchManager {
     /// the other status line choices (temp basal, eventual glucose, ISF & target).
     public static var capabilities: SmartwatchCapabilities { [.glucose, .history, .alerts, .loopStatus, .therapy] }
 
+    /// Only what the chosen status line needs: no loop status or therapy values
+    /// with None, loop status for every shown line, therapy values for the lines
+    /// the phone formats from them. The host fills nothing else.
+    public var requestedCapabilities: SmartwatchCapabilities {
+        var requested: SmartwatchCapabilities = [.glucose, .history, .alerts]
+        let statusLine = settings.statusLine
+        if statusLine.needsLoopStatus { requested.insert(.loopStatus) }
+        if statusLine.needsTherapy { requested.insert(.therapy) }
+        return requested
+    }
+
 
     public var pluginIdentifier: String { Self.pluginIdentifier }
     public var localizedTitle: String { Self.localizedTitle }
@@ -52,11 +63,16 @@ public final class LupedSmartwatchManager: SmartwatchManager {
         get { lockedSettings.value }
         set {
             guard newValue != lockedSettings.value else { return }
+            let requestedBefore = requestedCapabilities
             lockedSettings.value = newValue
             Task { @MainActor in
                 self.transportIfStarted?.settings = newValue
             }
             smartwatchManagerDelegate?.smartwatchManagerDidUpdateState(self)
+            // The host fills only what is requested; ask it for a snapshot with the new set.
+            if requestedCapabilities != requestedBefore {
+                smartwatchManagerDelegate?.smartwatchManagerRequestsRefresh(self)
+            }
         }
     }
     private let lockedSettings: Locked<LupedSettings>

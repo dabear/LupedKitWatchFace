@@ -29,6 +29,27 @@ final class LupedSmartwatchManagerTests: XCTestCase {
         XCTAssertEqual(restored.settings, settings)
     }
 
+    // The host fills only what the chosen status line needs, and is asked for a
+    // new snapshot when that changes.
+    func testRequestedCapabilitiesFollowTheStatusLine() {
+        let manager = LupedSmartwatchManager(settings: LupedSettings(isEnabled: false, statusLine: .none))
+        let delegate = MockSmartwatchManagerDelegate()
+        manager.smartwatchManagerDelegate = delegate
+        XCTAssertEqual(manager.requestedCapabilities, [.glucose, .history, .alerts])
+
+        manager.settings.statusLine = .iobAndCob
+        XCTAssertEqual(manager.requestedCapabilities, [.glucose, .history, .alerts, .loopStatus])
+        XCTAssertEqual(delegate.refreshRequests, 1)
+
+        manager.settings.statusLine = .eventualGlucose
+        XCTAssertEqual(manager.requestedCapabilities, [.glucose, .history, .alerts, .loopStatus, .therapy])
+        XCTAssertEqual(delegate.refreshRequests, 2)
+
+        manager.settings.statusLine = .tempBasal
+        XCTAssertEqual(delegate.refreshRequests, 2, "same capabilities: no new snapshot needed")
+        XCTAssertTrue(manager.requestedCapabilities.isSubset(of: LupedSmartwatchManager.capabilities))
+    }
+
     func testSettingsChangesSaveState() {
         let manager = LupedSmartwatchManager(settings: LupedSettings(isEnabled: false))
         let delegate = MockSmartwatchManagerDelegate()
@@ -248,7 +269,8 @@ private final class MockSmartwatchManagerDelegate: SmartwatchManagerDelegate {
     func smartwatchManagerDidUpdateState(_ manager: SmartwatchManager) { stateUpdates += 1 }
     func smartwatchManagerWantsDeletion(_ manager: SmartwatchManager) async { deletions += 1 }
     func smartwatchManager(_ manager: SmartwatchManager, glucoseSamplesSince start: Date) async throws -> [SmartwatchGlucoseReading] { [] }
-    func smartwatchManagerRequestsRefresh(_ manager: SmartwatchManager) {}
+    var refreshRequests = 0
+    func smartwatchManagerRequestsRefresh(_ manager: SmartwatchManager) { refreshRequests += 1 }
     func smartwatchManager(_ manager: SmartwatchManager, didLogEvent event: SmartwatchDeviceLogEntry) { logEntries.append(event) }
     func smartwatchManager(_ manager: SmartwatchManager, didAcknowledgeAlert identifier: SmartwatchAlertIdentifier) async { acknowledgedAlerts.append(identifier) }
     func smartwatchManager(_ manager: SmartwatchManager, requestBolus request: SmartwatchBolusRequest) async throws -> Double { throw SmartwatchBolusError.notAllowed }
