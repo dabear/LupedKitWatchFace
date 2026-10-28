@@ -99,6 +99,10 @@ struct LupedDiagnosticsView: View {
     let transport: LupedTransport
     var allowDebugFeatures = false
 
+    /// Test tools for watch requests (Send Test Result). Off by default; set to
+    /// true to show them, and only in the host's debug builds.
+    static let showsTestTools = false
+
     /// Sample replies for testing how the watchface shows a request's outcome.
     private static let testResults = ["bolus:ok", "bolus:refused", "forcedbolus:ok", "carbs:ok", "carbs:failed", "mute:ok", "mute:ignored"]
 
@@ -114,7 +118,7 @@ struct LupedDiagnosticsView: View {
                 Text(String(format: LocalizedString("Everything %1$@ sends to and receives from the watch since %1$@ started, newest first. The same lines are kept in %1$@'s device log for issue reports.", comment: "Footer for the Pebble log section (1: app name)"), LupedSmartwatchManager.hostName))
             }
 
-            if allowDebugFeatures {
+            if Self.showsTestTools && allowDebugFeatures {
                 Section {
                     Menu(LocalizedString("Send Test Result", comment: "Debug menu sending a sample RESULT to the Pebble watch")) {
                         ForEach(Self.testResults, id: \.self) { result in
