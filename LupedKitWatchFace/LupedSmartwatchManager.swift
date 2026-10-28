@@ -111,14 +111,16 @@ public final class LupedSmartwatchManager: SmartwatchManager {
     static let alertStatePriority = [2, 1, 3, 4]
 
     /// The watch's alert state for a host alert: 1 low, 2 urgent low, 3 high,
-    /// 4 predicted low; `nil` for anything that isn't a glucose alert.
-    static func alertState(for identifier: SmartwatchAlertIdentifier) -> Int? {
-        let value = identifier.value
-        if value.hasSuffix("glucose.urgentLow") { return 2 }
-        if value.hasSuffix("glucose.low") { return 1 }
-        if value.hasSuffix("glucose.high") { return 3 }
-        if value.hasSuffix("glucose.predictedLow") { return 4 }
-        return nil
+    /// 4 predicted low; `nil` for anything that isn't a glucose alert. From the
+    /// type the host sets, not its alert identifiers, which differ per host.
+    static func alertState(for alert: SmartwatchAlert) -> Int? {
+        switch alert.glucoseAlertType {
+        case .urgentLow: 2
+        case .low: 1
+        case .high: 3
+        case .predictedLow: 4
+        case nil: nil
+        }
     }
 
     /// What the watch sees (DATA index 8): the most important active glucose
@@ -128,7 +130,7 @@ public final class LupedSmartwatchManager: SmartwatchManager {
     /// keeps its colour, but the watch only buzzes for a positive state. Host
     /// alert mute is followed on the host side (muted alerts aren't forwarded).
     @MainActor var hostAlertState: Int {
-        let active = Set(activeAlerts.keys.compactMap(Self.alertState(for:)))
+        let active = Set(activeAlerts.values.compactMap(Self.alertState(for:)))
         guard let state = Self.alertStatePriority.first(where: active.contains) else { return 0 }
         return settings.alarmsEnabled ? state : -state
     }
@@ -139,7 +141,7 @@ public final class LupedSmartwatchManager: SmartwatchManager {
             let since = DateFormatter.localizedString(from: alertTrackingStarted, dateStyle: .none, timeStyle: .short)
             return "no active alerts from \(Self.hostName) since \(since); muted alerts aren't sent"
         }
-        let priority = { (alert: SmartwatchAlert) in Self.alertState(for: alert.identifier).flatMap(Self.alertStatePriority.firstIndex(of:)) ?? Int.max }
+        let priority = { (alert: SmartwatchAlert) in Self.alertState(for: alert).flatMap(Self.alertStatePriority.firstIndex(of:)) ?? Int.max }
         let titles = activeAlerts.values
             .sorted { priority($0) < priority($1) }
             .map { $0.title ?? $0.identifier.value }

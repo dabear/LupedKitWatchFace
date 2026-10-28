@@ -190,7 +190,8 @@ final class LupedSmartwatchManagerTests: XCTestCase {
     }
 
     private func glucoseAlert(_ kind: String, _ level: SmartwatchAlertLevel = .warning, title: String? = nil) -> SmartwatchAlert {
-        SmartwatchAlert(identifier: SmartwatchAlertIdentifier("GlucoseAlertManager.glucose." + kind), level: level, title: title, body: nil, issuedAt: Date())
+        // The identifier is host-specific (here Trio-style, with a UUID); the type is what counts.
+        SmartwatchAlert(identifier: SmartwatchAlertIdentifier("glucose." + kind), level: level, title: title, body: nil, issuedAt: Date(), glucoseAlertType: SmartwatchGlucoseAlertType(rawValue: kind))
     }
 
     /// The watch's alert state (DATA index 8) is the most important active glucose
@@ -210,14 +211,25 @@ final class LupedSmartwatchManagerTests: XCTestCase {
         XCTAssertEqual(manager.hostAlertState, 1, "Low outranks high")
         manager.watchAlertDidIssue(glucoseAlert("urgentLow", .critical))
         XCTAssertEqual(manager.hostAlertState, 2, "Urgent low outranks everything")
-        manager.watchAlertDidRetract(SmartwatchAlertIdentifier("GlucoseAlertManager.glucose.urgentLow"))
+        manager.watchAlertDidRetract(SmartwatchAlertIdentifier("glucose.urgentLow"))
         XCTAssertEqual(manager.hostAlertState, 1)
         manager.watchAlertDidIssue(SmartwatchAlert(identifier: SmartwatchAlertIdentifier("Pump.occlusion"), level: .critical, title: nil, body: nil, issuedAt: Date()))
         XCTAssertEqual(manager.hostAlertState, 1, "Non-glucose alerts don't set a state")
         for kind in ["low", "high", "predictedLow"] {
-            manager.watchAlertDidRetract(SmartwatchAlertIdentifier("GlucoseAlertManager.glucose." + kind))
+            manager.watchAlertDidRetract(SmartwatchAlertIdentifier("glucose." + kind))
         }
         XCTAssertEqual(manager.hostAlertState, 0)
+    }
+
+    /// The state comes from the host's glucose alert type, whatever its identifiers
+    /// look like (Trio's are `Trio.glucose.<type>.<UUID>`).
+    func testAlertStateUsesTheTypeNotTheIdentifier() {
+        let manager = LupedSmartwatchManager(settings: LupedSettings(isEnabled: true))
+        manager.smartwatchManagerDelegate = MockSmartwatchManagerDelegate()
+        manager.watchAlertDidIssue(SmartwatchAlert(identifier: SmartwatchAlertIdentifier("Trio.glucose.low.3F2A9C1E"), level: .critical, title: "Low", body: nil, issuedAt: Date(), glucoseAlertType: .low))
+        XCTAssertEqual(manager.hostAlertState, 1)
+        manager.watchAlertDidIssue(SmartwatchAlert(identifier: SmartwatchAlertIdentifier("GlucoseAlertManager.glucose.high"), level: .warning, title: nil, body: nil, issuedAt: Date()))
+        XCTAssertEqual(manager.hostAlertState, 1, "An alert without a glucose type doesn't set a state")
     }
 
     /// With watch alarms off the state is negative: the ring keeps its colour, but
