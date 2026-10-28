@@ -344,11 +344,7 @@ struct LupedWatchInfoSection: View {
         } header: {
             Text(LocalizedString("Watch", comment: "Header for the Pebble watch info section"))
         } footer: {
-            Text(String(format: LocalizedString("The watchface reports this about once an hour, and again when you open this screen if it can answer right away. Refresh Watch Info asks now; after %@ reconnects, the watchface restarts for a moment so it can reply. Counters cover at most the last 48 hours.", comment: "Footer for the Pebble watch info section (1: app name)"), LupedSmartwatchManager.hostName))
-        }
-        .onAppear {
-            // Fresh numbers without a tap, but never at the cost of restarting the watchface.
-            transport.requestDiagnosticsIfReachable()
+            Text(String(format: LocalizedString("The watchface reports this about once an hour. Refresh Watch Info asks now; after %@ reconnects, the watchface restarts for a moment so it can reply. Counters cover at most the last 48 hours.", comment: "Footer for the Pebble watch info section (1: app name)"), LupedSmartwatchManager.hostName))
         }
     }
 
