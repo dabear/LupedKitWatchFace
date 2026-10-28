@@ -13,13 +13,16 @@ import SwiftUI
 @MainActor
 final class LupedSettingsModel: ObservableObject {
     let manager: LupedSmartwatchManager
+    /// The host's debug builds show test tools, such as sending a test RESULT.
+    let allowDebugFeatures: Bool
 
     @Published var settings: LupedSettings {
         didSet { manager.settings = settings }
     }
 
-    init(manager: LupedSmartwatchManager) {
+    init(manager: LupedSmartwatchManager, allowDebugFeatures: Bool = false) {
         self.manager = manager
+        self.allowDebugFeatures = allowDebugFeatures
         settings = manager.settings
     }
 }
@@ -53,7 +56,7 @@ struct LupedWatchSettingsView: View {
             }
 
             Section {
-                NavigationLink(destination: LupedDiagnosticsView(transport: transport)) {
+                NavigationLink(destination: LupedDiagnosticsView(transport: transport, allowDebugFeatures: model.allowDebugFeatures)) {
                     Text(LocalizedString("Diagnostics", comment: "Row opening Pebble diagnostics"))
                 }
                 NavigationLink(destination: LupedAdvancedSettingsView(model: model)) {
@@ -94,6 +97,10 @@ struct LupedWatchSettingsView: View {
 /// Watch info and the communication log, for troubleshooting.
 struct LupedDiagnosticsView: View {
     let transport: LupedTransport
+    var allowDebugFeatures = false
+
+    /// Sample replies for testing how the watchface shows a request's outcome.
+    private static let testResults = ["bolus:ok", "bolus:refused", "forcedbolus:ok", "carbs:ok", "carbs:failed", "mute:ok", "mute:ignored"]
 
     var body: some View {
         List {
@@ -105,6 +112,20 @@ struct LupedDiagnosticsView: View {
                 }
             } footer: {
                 Text(String(format: LocalizedString("Everything %1$@ sends to and receives from the watch since %1$@ started, newest first. The same lines are kept in %1$@'s device log for issue reports.", comment: "Footer for the Pebble log section (1: app name)"), LupedSmartwatchManager.hostName))
+            }
+
+            if allowDebugFeatures {
+                Section {
+                    Menu(LocalizedString("Send Test Result", comment: "Debug menu sending a sample RESULT to the Pebble watch")) {
+                        ForEach(Self.testResults, id: \.self) { result in
+                            Button(result) { transport.sendResult(result) }
+                        }
+                    }
+                } header: {
+                    Text(LocalizedString("Debug", comment: "Header for the Pebble debug tools"))
+                } footer: {
+                    Text(LocalizedString("Sends a sample outcome of a watch request (RESULT) so you can see how the watchface shows it. Nothing is requested or delivered.", comment: "Footer for the Pebble test result menu"))
+                }
             }
         }
         .insetGroupedListStyle()

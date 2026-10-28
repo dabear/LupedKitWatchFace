@@ -30,7 +30,7 @@ extension LupedSmartwatchManager: @retroactive SmartwatchManagerUI {
 
     @MainActor
     public func settingsViewController(bluetoothProvider: BluetoothProvider, displayGlucosePreference: DisplayGlucosePreference, colorPalette: LoopUIColorPalette, allowDebugFeatures: Bool) -> SmartwatchManagerViewController {
-        LupedSettingsNavigationController(manager: self)
+        LupedSettingsNavigationController(manager: self, allowDebugFeatures: allowDebugFeatures)
     }
 
     public var watchStatusHighlight: DeviceStatusHighlight? { nil }
@@ -110,9 +110,9 @@ final class LupedSettingsNavigationController: UINavigationController, Smartwatc
     weak var smartwatchManagerOnboardingDelegate: SmartwatchManagerOnboardingDelegate?
     weak var completionDelegate: CompletionDelegate?
 
-    init(manager: LupedSmartwatchManager) {
+    init(manager: LupedSmartwatchManager, allowDebugFeatures: Bool) {
         super.init(nibName: nil, bundle: nil)
-        let model = LupedSettingsModel(manager: manager)
+        let model = LupedSettingsModel(manager: manager, allowDebugFeatures: allowDebugFeatures)
         let view = LupedWatchSettingsView(model: model) { [weak self] in
             guard let self else { return }
             self.completionDelegate?.completionNotifyingDidComplete(self)

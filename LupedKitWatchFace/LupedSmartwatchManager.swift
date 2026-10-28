@@ -33,13 +33,6 @@ public final class LupedSmartwatchManager: SmartwatchManager {
     /// them, a request from the watch is logged as ignored and never reaches the host.
     public static var capabilities: SmartwatchCapabilities { [.glucose, .history, .alerts] }
 
-    /// Every bolus the watch asks for is this size while remote bolus is being
-    /// tested; the watch sends no amount.
-    static let testBolusUnits = 0.1
-    /// Every carb entry the watch asks for is this size while remote carbs are
-    /// being tested; the watch sends no amount.
-    static let testCarbGrams = 1.0
-
 
     public var pluginIdentifier: String { Self.pluginIdentifier }
     public var localizedTitle: String { Self.localizedTitle }
@@ -171,11 +164,11 @@ public final class LupedSmartwatchManager: SmartwatchManager {
         transport.alertMuteRequested = { [weak self] duration in
             self?.requestAlertMute(duration)
         }
-        transport.bolusRequested = { [weak self] forced in
-            self?.requestBolus(forced: forced)
+        transport.bolusRequested = { [weak self] units, forced in
+            self?.requestBolus(units, forced: forced)
         }
-        transport.carbsRequested = { [weak self] in
-            self?.requestCarbs()
+        transport.carbsRequested = { [weak self] grams in
+            self?.requestCarbs(grams)
         }
         if let saved = savedDiagnostics {
             transport.restoreDiagnostics(json: saved.json, receivedAt: saved.receivedAt)
@@ -215,12 +208,12 @@ public final class LupedSmartwatchManager: SmartwatchManager {
         }
     }
 
-    /// Asks the host for a `testBolusUnits` bolus against the bolus context it
+    /// Asks the host for the bolus the watch chose, against the bolus context it
     /// last sent, and logs the outcome. The host's policy decides: permission,
     /// request and context age, maximum bolus, recommendation (skipped when
     /// `forced`) and rate limits.
     @MainActor
-    func requestBolus(forced: Bool = false) {
+    func requestBolus(_ units: Double, forced: Bool = false) {
         let action = forced ? "forcedbolus" : "bolus"
         guard Self.capabilities.contains(.remoteBolus) else {
             logNote("Bolus request from the watch ignored: remote bolus is off for this watch", kind: .info)
@@ -237,7 +230,7 @@ public final class LupedSmartwatchManager: SmartwatchManager {
             transport.sendResult("\(action):failed")
             return
         }
-        let request = SmartwatchBolusRequest(units: Self.testBolusUnits, contextToken: context.token, requestedAt: Date(), isForced: forced)
+        let request = SmartwatchBolusRequest(units: units, contextToken: context.token, requestedAt: Date(), isForced: forced)
         logNote(String(format: "Asking %@ for a %.2f U %@from the watch", Self.hostName, request.units, forced ? "forced bolus (recommendation not checked) " : "bolus "), kind: .info)
         Task { @MainActor in
             do {
@@ -251,10 +244,10 @@ public final class LupedSmartwatchManager: SmartwatchManager {
         }
     }
 
-    /// Asks the host to add a `testCarbGrams` carb entry, and logs the outcome.
+    /// Asks the host to add the carb entry the watch chose, and logs the outcome.
     /// The host decides: permission and rate limit.
     @MainActor
-    func requestCarbs() {
+    func requestCarbs(_ grams: Double) {
         guard Self.capabilities.contains(.remoteCarbs) else {
             logNote("Carb request from the watch ignored: remote carbs are off for this watch", kind: .info)
             transport.sendResult("carbs:ignored")
@@ -265,11 +258,11 @@ public final class LupedSmartwatchManager: SmartwatchManager {
             transport.sendResult("carbs:failed")
             return
         }
-        logNote(String(format: "Asking %@ to add %.0f g of carbs from the watch", Self.hostName, Self.testCarbGrams), kind: .info)
+        logNote(String(format: "Asking %@ to add %g g of carbs from the watch", Self.hostName, grams), kind: .info)
         Task { @MainActor in
             do {
-                let grams = try await delegate.smartwatchManager(self, requestCarbEntry: Self.testCarbGrams)
-                logNote(String(format: "%@ added %.0f g of carbs requested from the watch", Self.hostName, grams), kind: .info)
+                let grams = try await delegate.smartwatchManager(self, requestCarbEntry: grams)
+                logNote(String(format: "%@ added %g g of carbs requested from the watch", Self.hostName, grams), kind: .info)
                 transport.sendResult("carbs:ok")
             } catch {
                 logNote("\(Self.hostName) refused the watch's carb request (\(error))", kind: .error)
