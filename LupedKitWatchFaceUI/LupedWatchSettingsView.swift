@@ -48,6 +48,16 @@ struct LupedWatchSettingsView: View {
             }
 
             Section {
+                Picker(LocalizedString("Status Line", comment: "Picker choosing what the Pebble status line shows"), selection: $model.settings.statusLine) {
+                    ForEach(LupedStatusLine.allCases, id: \.self) { choice in
+                        Text(choice.title).tag(choice)
+                    }
+                }
+            } footer: {
+                Text(String(format: LocalizedString("The black line under the glucose ring. IOB and COB dim when %1$@ hasn't looped for 16 minutes. Not shown with the full-screen ring.", comment: "Footer for the Pebble status line picker (1: app name)"), LupedSmartwatchManager.hostName))
+            }
+
+            Section {
                 Toggle(LocalizedString("Watch Alarms", comment: "Toggle enabling Pebble watch vibration alarms"), isOn: $model.settings.alarmsEnabled)
             } header: {
                 Text(LocalizedString("Alarms", comment: "Header for the Pebble alarm settings"))
@@ -475,5 +485,17 @@ struct LupedLogDetailLine: View {
             return nil
         }
         return (String(line[..<cut]), String(line[cut...]))
+    }
+}
+
+extension LupedStatusLine {
+    /// The name shown in the Status Line picker.
+    var title: String {
+        switch self {
+        case .iobAndCob: LocalizedString("IOB & COB", comment: "Pebble status line choice: insulin and carbs on board")
+        case .tempBasal: LocalizedString("Temp Basal", comment: "Pebble status line choice: current temp or scheduled basal rate")
+        case .eventualGlucose: LocalizedString("Eventual Glucose", comment: "Pebble status line choice: predicted eventual glucose")
+        case .sensitivityAndTarget: LocalizedString("ISF & Target", comment: "Pebble status line choice: insulin sensitivity and correction range")
+        }
     }
 }

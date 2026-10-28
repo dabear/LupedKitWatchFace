@@ -31,8 +31,9 @@ public final class LupedSmartwatchManager: SmartwatchManager {
     /// declared: their request handling below is ready, but the watchface has to
     /// react to `RESULT` and the requests need stronger security first. Without
     /// them, a request from the watch is logged as ignored and never reaches the host.
-    /// `.loopStatus` feeds the watch's IOB/COB strip and loop ring.
-    public static var capabilities: SmartwatchCapabilities { [.glucose, .history, .alerts, .loopStatus] }
+    /// `.loopStatus` feeds the watch's IOB/COB strip and loop ring; `.therapy`
+    /// the other status line choices (temp basal, eventual glucose, ISF & target).
+    public static var capabilities: SmartwatchCapabilities { [.glucose, .history, .alerts, .loopStatus, .therapy] }
 
 
     public var pluginIdentifier: String { Self.pluginIdentifier }
@@ -346,7 +347,16 @@ public final class LupedSmartwatchManager: SmartwatchManager {
                 carbsOnBoard: snapshot.carbsOnBoard,
                 lastLoopCompleted: snapshot.lastLoopCompleted,
                 isClosedLoop: snapshot.isClosedLoop
-            )
+            ),
+            therapy: snapshot.therapy.map {
+                LupedTherapy(
+                    tempBasalRate: $0.tempBasalRate,
+                    scheduledBasalRate: $0.scheduledBasalRate,
+                    insulinSensitivity: $0.insulinSensitivity,
+                    eventualGlucose: $0.eventualGlucose,
+                    correctionRange: $0.correctionRange
+                )
+            }
         )
     }
 
