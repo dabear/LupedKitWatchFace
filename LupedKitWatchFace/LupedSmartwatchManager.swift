@@ -31,7 +31,8 @@ public final class LupedSmartwatchManager: SmartwatchManager {
     /// declared: their request handling below is ready, but the watchface has to
     /// react to `RESULT` and the requests need stronger security first. Without
     /// them, a request from the watch is logged as ignored and never reaches the host.
-    public static var capabilities: SmartwatchCapabilities { [.glucose, .history, .alerts] }
+    /// `.loopStatus` feeds the watch's IOB/COB strip and loop ring.
+    public static var capabilities: SmartwatchCapabilities { [.glucose, .history, .alerts, .loopStatus] }
 
 
     public var pluginIdentifier: String { Self.pluginIdentifier }
@@ -338,7 +339,14 @@ public final class LupedSmartwatchManager: SmartwatchManager {
             // Thresholds don't travel to the watch; alerts are host-issued.
             hostAlertLevel: hostAlertLevel,
             hostAlertReason: hostAlertReason,
-            alertEvent: alertEvent
+            alertEvent: alertEvent,
+            // IOB, COB and the loop's age and mode for the watch's strip and loop ring.
+            loopStatus: LupedLoopStatus(
+                insulinOnBoard: snapshot.insulinOnBoard,
+                carbsOnBoard: snapshot.carbsOnBoard,
+                lastLoopCompleted: snapshot.lastLoopCompleted,
+                isClosedLoop: snapshot.isClosedLoop
+            )
         )
     }
 

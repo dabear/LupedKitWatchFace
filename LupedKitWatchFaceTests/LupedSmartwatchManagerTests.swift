@@ -129,11 +129,11 @@ final class LupedSmartwatchManagerTests: XCTestCase {
         XCTAssertEqual(snapshot.alertEvent, 0)
     }
 
-    /// Loop status, therapy context and URLs are optional: Luped declares none of
-    /// them, ignores therapy a host sends anyway, and handles no URL. Remote
-    /// actions stay off until the watchface reacts to RESULT and requests are secured.
+    /// Luped declares loop status (IOB/COB and the loop ring) but not therapy
+    /// context or URLs: it ignores therapy a host sends anyway and handles no URL.
+    /// Remote actions stay off until requests are secured.
     func testOptionalHostFeaturesStayOff() throws {
-        XCTAssertEqual(LupedSmartwatchManager.capabilities, [.glucose, .history, .alerts])
+        XCTAssertEqual(LupedSmartwatchManager.capabilities, [.glucose, .history, .alerts, .loopStatus])
         let manager = LupedSmartwatchManager(settings: LupedSettings(isEnabled: false))
         let reading = sample(120, minutes: 5)
         manager.latestSnapshot = SmartwatchStatusSnapshot(displayUnit: .milligramsPerDeciliter, glucose: reading, glucoseHistory: [reading])
@@ -146,6 +146,8 @@ final class LupedSmartwatchManagerTests: XCTestCase {
         let withExtras = try XCTUnwrap(manager.lupedSnapshot())
         XCTAssertEqual(withExtras.readings, plain.readings)
         XCTAssertEqual(withExtras.unit, plain.unit)
+        // Loop status reaches the watch (IOB/COB strip and loop ring).
+        XCTAssertEqual(withExtras.loopStatus, LupedLoopStatus(insulinOnBoard: 1.2, carbsOnBoard: 15))
         XCTAssertFalse(manager.watchHostDidReceiveURL(URL(string: "trio://smartwatch/callback")!))
     }
 
