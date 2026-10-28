@@ -27,10 +27,10 @@ public final class LupedSmartwatchManager: SmartwatchManager {
     }
     public static let localizedTitle = LocalizedString("Pebble", comment: "Title of the Luped Pebble watch manager")
 
-    /// `.remoteMute`, `.bolus` and `.remoteCarbs` are declared for testing the
+    /// `.remoteMute`, `.remoteBolus` and `.remoteCarbs` are declared for testing the
     /// watch's requests; the host still refuses them unless its user allowed
     /// them (and, for boluses and carbs, the build enables them).
-    public static var capabilities: SmartwatchCapabilities { [.glucose, .history, .alerts, .remoteMute, .bolus, .remoteCarbs] }
+    public static var capabilities: SmartwatchCapabilities { [.glucose, .history, .alerts, .remoteMute, .remoteBolus, .remoteCarbs] }
 
     /// Every bolus the watch asks for is this size while remote bolus is being
     /// tested; the watch sends no amount.
@@ -221,7 +221,7 @@ public final class LupedSmartwatchManager: SmartwatchManager {
     @MainActor
     func requestBolus(forced: Bool = false) {
         let action = forced ? "forcedbolus" : "bolus"
-        guard Self.capabilities.contains(.bolus) else {
+        guard Self.capabilities.contains(.remoteBolus) else {
             logNote("Bolus request from the watch ignored: remote bolus is off for this watch", kind: .info)
             transport.sendResult("\(action):ignored")
             return
