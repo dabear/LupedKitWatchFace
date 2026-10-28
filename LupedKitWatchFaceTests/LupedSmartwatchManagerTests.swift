@@ -29,24 +29,27 @@ final class LupedSmartwatchManagerTests: XCTestCase {
         XCTAssertEqual(restored.settings, settings)
     }
 
-    // The host fills only what the chosen status line needs, and is asked for a
-    // new snapshot when that changes.
-    func testRequestedCapabilitiesFollowTheStatusLine() {
-        let manager = LupedSmartwatchManager(settings: LupedSettings(isEnabled: false, statusLine: .none))
+    // The host fills only what the watch shows (status line and loop ring), and
+    // is asked for a new snapshot when that changes.
+    func testRequestedCapabilitiesFollowTheStatusLineAndLoopRing() {
+        let manager = LupedSmartwatchManager(settings: LupedSettings(isEnabled: false, statusLine: .none, loopRing: false))
         let delegate = MockSmartwatchManagerDelegate()
         manager.smartwatchManagerDelegate = delegate
         XCTAssertEqual(manager.requestedCapabilities, [.glucose, .history, .alerts])
 
-        manager.settings.statusLine = .iobAndCob
-        XCTAssertEqual(manager.requestedCapabilities, [.glucose, .history, .alerts, .loopStatus])
+        manager.settings.loopRing = true
+        XCTAssertEqual(manager.requestedCapabilities, [.glucose, .history, .alerts, .loopStatus], "None with the loop ring still needs the loop's age")
         XCTAssertEqual(delegate.refreshRequests, 1)
+
+        manager.settings.statusLine = .iobAndCob
+        XCTAssertEqual(delegate.refreshRequests, 1, "same capabilities: no new snapshot needed")
 
         manager.settings.statusLine = .eventualGlucose
         XCTAssertEqual(manager.requestedCapabilities, [.glucose, .history, .alerts, .loopStatus, .therapy])
         XCTAssertEqual(delegate.refreshRequests, 2)
 
-        manager.settings.statusLine = .tempBasal
-        XCTAssertEqual(delegate.refreshRequests, 2, "same capabilities: no new snapshot needed")
+        manager.settings.loopRing = false
+        XCTAssertEqual(manager.requestedCapabilities, [.glucose, .history, .alerts, .loopStatus, .therapy], "a shown line keeps the loop ring")
         XCTAssertTrue(manager.requestedCapabilities.isSubset(of: LupedSmartwatchManager.capabilities))
     }
 

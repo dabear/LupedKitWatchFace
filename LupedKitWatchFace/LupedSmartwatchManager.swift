@@ -35,14 +35,13 @@ public final class LupedSmartwatchManager: SmartwatchManager {
     /// the other status line choices (temp basal, eventual glucose, ISF & target).
     public static var capabilities: SmartwatchCapabilities { [.glucose, .history, .alerts, .loopStatus, .therapy] }
 
-    /// Only what the chosen status line needs: no loop status or therapy values
-    /// with None, loop status for every shown line, therapy values for the lines
-    /// the phone formats from them. The host fills nothing else.
+    /// Only what the watch shows: loop status while the loop ring shows (every
+    /// shown line, and None with Loop Ring on), therapy values for the lines the
+    /// phone formats from them. The host fills nothing else.
     public var requestedCapabilities: SmartwatchCapabilities {
         var requested: SmartwatchCapabilities = [.glucose, .history, .alerts]
-        let statusLine = settings.statusLine
-        if statusLine.needsLoopStatus { requested.insert(.loopStatus) }
-        if statusLine.needsTherapy { requested.insert(.therapy) }
+        if settings.needsLoopStatus { requested.insert(.loopStatus) }
+        if settings.needsTherapy { requested.insert(.therapy) }
         return requested
     }
 

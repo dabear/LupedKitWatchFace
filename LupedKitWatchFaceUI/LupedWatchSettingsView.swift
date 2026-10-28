@@ -53,8 +53,13 @@ struct LupedWatchSettingsView: View {
                         Text(choice.title).tag(choice)
                     }
                 }
+                Toggle(LocalizedString("Loop Ring", comment: "Toggle showing the loop ring (minutes since the last loop) on the Pebble"), isOn: Binding(
+                    get: { model.settings.showsLoopRing },
+                    set: { model.settings.loopRing = $0 }
+                ))
+                .disabled(model.settings.statusLine != .none)
             } footer: {
-                Text(String(format: LocalizedString("The black line under the glucose ring. It dims when %1$@ hasn't looped for 16 minutes. With None, the line and the loop ring stay empty, and %1$@ sends no loop or therapy values to the watch. Not shown with the full-screen ring.", comment: "Footer for the Pebble status line picker (1: app name)"), LupedSmartwatchManager.hostName))
+                Text(model.settings.statusLineFooter)
             }
 
             Section {
@@ -485,6 +490,37 @@ struct LupedLogDetailLine: View {
             return nil
         }
         return (String(line[..<cut]), String(line[cut...]))
+    }
+}
+
+extension LupedSettings {
+    /// The footer under the Status Line picker and Loop Ring toggle: what the
+    /// watch shows and exactly what the app sends to it.
+    var statusLineFooter: String {
+        let host = LupedSmartwatchManager.hostName
+        let explanation: String
+        if statusLine != .none {
+            explanation = String(format: LocalizedString("The black line under the glucose ring, next to the loop ring with the minutes since %1$@ last looped. The line dims when %1$@ hasn't looped for 16 minutes, which needs the loop's age, so the loop ring stays on while a line is shown. Not shown with the full-screen ring.", comment: "Footer for the Pebble status line with a line chosen (1: app name)"), host)
+        } else if loopRing {
+            explanation = String(format: LocalizedString("The line stays empty. The loop ring still shows the minutes since %1$@ last looped.", comment: "Footer for the Pebble status line set to None with the loop ring on (1: app name)"), host)
+        } else {
+            explanation = String(format: LocalizedString("The line and the loop ring stay empty, and the watch doesn't show when %1$@ last looped.", comment: "Footer for the Pebble status line set to None with the loop ring off (1: app name)"), host)
+        }
+        var sent = [LocalizedString("glucose", comment: "Item in the Pebble 'sent to the watch' list"), LocalizedString("alerts", comment: "Item in the Pebble 'sent to the watch' list")]
+        if statusLine == .iobAndCob {
+            sent.append(LocalizedString("IOB and COB", comment: "Item in the Pebble 'sent to the watch' list"))
+        }
+        if showsLoopRing {
+            sent.append(LocalizedString("last loop and closed/open loop", comment: "Item in the Pebble 'sent to the watch' list"))
+        }
+        switch statusLine {
+        case .tempBasal: sent.append(LocalizedString("temp basal", comment: "Item in the Pebble 'sent to the watch' list"))
+        case .eventualGlucose: sent.append(LocalizedString("eventual glucose", comment: "Item in the Pebble 'sent to the watch' list"))
+        case .sensitivityAndTarget: sent.append(LocalizedString("ISF and target", comment: "Item in the Pebble 'sent to the watch' list"))
+        case .none, .iobAndCob: break
+        }
+        let sentLine = String(format: LocalizedString("Sent to the watch: %@.", comment: "Pebble footer listing what the app sends to the watch (1: comma-separated list)"), sent.joined(separator: ", "))
+        return explanation + "\n\n" + sentLine
     }
 }
 
