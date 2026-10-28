@@ -166,8 +166,8 @@ public final class LupedSmartwatchManager: SmartwatchManager {
         transport.alertMuteRequested = { [weak self] duration in
             self?.requestAlertMute(duration)
         }
-        transport.bolusRequested = { [weak self] in
-            self?.requestBolus()
+        transport.bolusRequested = { [weak self] forced in
+            self?.requestBolus(forced: forced)
         }
         if let saved = savedDiagnostics {
             transport.restoreDiagnostics(json: saved.json, receivedAt: saved.receivedAt)
@@ -205,9 +205,10 @@ public final class LupedSmartwatchManager: SmartwatchManager {
 
     /// Asks the host for a `testBolusUnits` bolus against the bolus context it
     /// last sent, and logs the outcome. The host's policy decides: permission,
-    /// request and context age, maximum bolus, recommendation and rate limits.
+    /// request and context age, maximum bolus, recommendation (skipped when
+    /// `forced`) and rate limits.
     @MainActor
-    func requestBolus() {
+    func requestBolus(forced: Bool = false) {
         guard Self.capabilities.contains(.bolus) else {
             logNote("Bolus request from the watch ignored: remote bolus is off for this watch", kind: .info)
             return
@@ -220,8 +221,8 @@ public final class LupedSmartwatchManager: SmartwatchManager {
             logNote("Bolus request not passed on: \(Self.hostName) hasn't sent a bolus context yet (Allow Boluses from Watch may be off)", kind: .error)
             return
         }
-        let request = SmartwatchBolusRequest(units: Self.testBolusUnits, contextToken: context.token, requestedAt: Date())
-        logNote(String(format: "Asking %@ for a %.2f U bolus from the watch", Self.hostName, request.units), kind: .info)
+        let request = SmartwatchBolusRequest(units: Self.testBolusUnits, contextToken: context.token, requestedAt: Date(), isForced: forced)
+        logNote(String(format: "Asking %@ for a %.2f U %@from the watch", Self.hostName, request.units, forced ? "forced bolus (recommendation not checked) " : "bolus "), kind: .info)
         Task { @MainActor in
             do {
                 let units = try await delegate.smartwatchManager(self, requestBolus: request)
