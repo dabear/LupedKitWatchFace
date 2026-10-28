@@ -39,10 +39,6 @@ public final class LupedSmartwatchManager: SmartwatchManager {
     /// being tested; the watch sends no amount.
     static let testCarbGrams = 1.0
 
-    /// The short reason for a `RESULT` line: `notAllowed`, not `notAllowed(...)`.
-    private static func resultReason(_ error: Error) -> String {
-        String(String(describing: error).prefix { $0 != "(" })
-    }
 
     public var pluginIdentifier: String { Self.pluginIdentifier }
     public var localizedTitle: String { Self.localizedTitle }
@@ -213,7 +209,7 @@ public final class LupedSmartwatchManager: SmartwatchManager {
                 transport.sendResult("mute:ok")
             } catch {
                 logNote("\(Self.hostName) refused the watch's mute request (\(error)); check Allow Mute from Watch in \(Self.hostName)'s settings", kind: .error)
-                transport.sendResult("mute:refused:\(Self.resultReason(error))")
+                transport.sendResult("mute:refused")
             }
         }
     }
@@ -237,7 +233,7 @@ public final class LupedSmartwatchManager: SmartwatchManager {
         }
         guard let context = latestSnapshot?.bolusContext else {
             logNote("Bolus request not passed on: \(Self.hostName) hasn't sent a bolus context yet (Allow Boluses from Watch may be off)", kind: .error)
-            transport.sendResult("\(action):failed:noContext")
+            transport.sendResult("\(action):failed")
             return
         }
         let request = SmartwatchBolusRequest(units: Self.testBolusUnits, contextToken: context.token, requestedAt: Date(), isForced: forced)
@@ -246,10 +242,10 @@ public final class LupedSmartwatchManager: SmartwatchManager {
             do {
                 let units = try await delegate.smartwatchManager(self, requestBolus: request)
                 logNote(String(format: "%@ delivered %.2f U requested from the watch", Self.hostName, units), kind: .info)
-                transport.sendResult(String(format: "%@:ok:%.2f", action, units))
+                transport.sendResult("\(action):ok")
             } catch {
                 logNote("\(Self.hostName) refused the watch's bolus request (\(error))", kind: .error)
-                transport.sendResult("\(action):refused:\(Self.resultReason(error))")
+                transport.sendResult("\(action):refused")
             }
         }
     }
@@ -273,10 +269,10 @@ public final class LupedSmartwatchManager: SmartwatchManager {
             do {
                 let grams = try await delegate.smartwatchManager(self, requestCarbEntry: Self.testCarbGrams)
                 logNote(String(format: "%@ added %.0f g of carbs requested from the watch", Self.hostName, grams), kind: .info)
-                transport.sendResult(String(format: "carbs:ok:%.0f", grams))
+                transport.sendResult("carbs:ok")
             } catch {
                 logNote("\(Self.hostName) refused the watch's carb request (\(error))", kind: .error)
-                transport.sendResult("carbs:refused:\(Self.resultReason(error))")
+                transport.sendResult("carbs:refused")
             }
         }
     }
