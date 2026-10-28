@@ -131,9 +131,9 @@ final class LupedSmartwatchManagerTests: XCTestCase {
 
     /// Loop status, therapy context and URLs are optional: Luped declares none of
     /// them, ignores therapy a host sends anyway, and handles no URL. It declares
-    /// `.remoteMute` for testing the watch's mute request.
+    /// `.remoteMute` and `.bolus` for testing the watch's requests.
     func testOptionalHostFeaturesStayOff() throws {
-        XCTAssertEqual(LupedSmartwatchManager.capabilities, [.glucose, .history, .alerts, .remoteMute])
+        XCTAssertEqual(LupedSmartwatchManager.capabilities, [.glucose, .history, .alerts, .remoteMute, .bolus])
         let manager = LupedSmartwatchManager(settings: LupedSettings(isEnabled: false))
         let reading = sample(120, minutes: 5)
         manager.latestSnapshot = SmartwatchStatusSnapshot(displayUnit: .milligramsPerDeciliter, glucose: reading, glucoseHistory: [reading])

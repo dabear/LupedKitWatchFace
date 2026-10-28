@@ -27,9 +27,14 @@ public final class LupedSmartwatchManager: SmartwatchManager {
     }
     public static let localizedTitle = LocalizedString("Pebble", comment: "Title of the Luped Pebble watch manager")
 
-    /// `.remoteMute` is declared for testing the watch's mute request; the host
-    /// still refuses it unless its user allowed muting from the watch.
-    public static var capabilities: SmartwatchCapabilities { [.glucose, .history, .alerts, .remoteMute] }
+    /// `.remoteMute` and `.bolus` are declared for testing the watch's requests;
+    /// the host still refuses them unless its user allowed them (and, for
+    /// boluses, the build enables them).
+    public static var capabilities: SmartwatchCapabilities { [.glucose, .history, .alerts, .remoteMute, .bolus] }
+
+    /// Every bolus the watch asks for is this size while remote bolus is being
+    /// tested; the watch sends no amount.
+    static let testBolusUnits = 0.1
 
     public var pluginIdentifier: String { Self.pluginIdentifier }
     public var localizedTitle: String { Self.localizedTitle }
@@ -161,6 +166,9 @@ public final class LupedSmartwatchManager: SmartwatchManager {
         transport.alertMuteRequested = { [weak self] duration in
             self?.requestAlertMute(duration)
         }
+        transport.bolusRequested = { [weak self] in
+            self?.requestBolus()
+        }
         if let saved = savedDiagnostics {
             transport.restoreDiagnostics(json: saved.json, receivedAt: saved.receivedAt)
         }
@@ -191,6 +199,35 @@ public final class LupedSmartwatchManager: SmartwatchManager {
                 logNote("\(Self.hostName) alerts muted from the watch until \(time)", kind: .info)
             } catch {
                 logNote("\(Self.hostName) refused the watch's mute request (\(error)); check Allow Mute from Watch in \(Self.hostName)'s alert settings", kind: .error)
+            }
+        }
+    }
+
+    /// Asks the host for a `testBolusUnits` bolus against the bolus context it
+    /// last sent, and logs the outcome. The host's policy decides: permission,
+    /// request and context age, maximum bolus, recommendation and rate limits.
+    @MainActor
+    func requestBolus() {
+        guard Self.capabilities.contains(.bolus) else {
+            logNote("Bolus request from the watch ignored: remote bolus is off for this watch", kind: .info)
+            return
+        }
+        guard let delegate = smartwatchManagerDelegate else {
+            logNote("Bolus request not passed on: \(Self.hostName) isn't connected to this watch manager", kind: .error)
+            return
+        }
+        guard let context = latestSnapshot?.bolusContext else {
+            logNote("Bolus request not passed on: \(Self.hostName) hasn't sent a bolus context yet (Allow Boluses from Watch may be off)", kind: .error)
+            return
+        }
+        let request = SmartwatchBolusRequest(units: Self.testBolusUnits, contextToken: context.token, requestedAt: Date())
+        logNote(String(format: "Asking %@ for a %.2f U bolus from the watch", Self.hostName, request.units), kind: .info)
+        Task { @MainActor in
+            do {
+                let units = try await delegate.smartwatchManager(self, requestBolus: request)
+                logNote(String(format: "%@ delivered %.2f U requested from the watch", Self.hostName, units), kind: .info)
+            } catch {
+                logNote("\(Self.hostName) refused the watch's bolus request (\(error))", kind: .error)
             }
         }
     }
