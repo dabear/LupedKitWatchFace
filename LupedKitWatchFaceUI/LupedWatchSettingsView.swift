@@ -516,7 +516,15 @@ extension LupedSettings {
         case .none, .iobAndCob: break
         }
         let sentLine = String(format: LocalizedString("Sent to the watch: %@.", comment: "Pebble footer listing what the app sends to the watch (1: comma-separated list)"), sent.joined(separator: ", "))
-        return explanation + "\n\n" + sentLine
+        let battery: String
+        if statusLine == .iobAndCob {
+            battery = String(format: LocalizedString("IOB and COB change as %1$@ recalculates them, so the watch gets updates between readings, which can use more watch battery.", comment: "Pebble footer: battery note for the IOB & COB status line (1: app name)"), host)
+        } else if showsLoopRing {
+            battery = String(format: LocalizedString("These change each time %1$@ loops, so the watch can get an extra update between readings, which uses a little more watch battery.", comment: "Pebble footer: battery note when loop status or therapy values are sent (1: app name)"), host)
+        } else {
+            battery = LocalizedString("Only new readings and alerts are sent, which uses the least watch battery.", comment: "Pebble footer: battery note when only glucose and alerts are sent")
+        }
+        return explanation + "\n\n" + sentLine + " " + battery
     }
 }
 
