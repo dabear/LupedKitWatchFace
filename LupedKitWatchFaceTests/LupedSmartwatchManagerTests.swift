@@ -50,6 +50,18 @@ final class LupedSmartwatchManagerTests: XCTestCase {
         XCTAssertTrue(manager.requestedCapabilities.isSubset(of: LupedSmartwatchManager.capabilities))
     }
 
+    // A plugin can't obtain a capability it didn't declare: hosts act only on
+    // effectiveCapabilities (declared ∩ requested).
+    func testUndeclaredRequestedCapabilitiesAreIgnored() {
+        let greedy = GreedySmartwatchManager()
+        XCTAssertEqual(greedy.effectiveCapabilities, [.glucose])
+        XCTAssertEqual(greedy.undeclaredRequestedCapabilities, [.remoteBolus, .loopStatus])
+
+        let luped = LupedSmartwatchManager(settings: LupedSettings(isEnabled: false, statusLine: .eventualGlucose))
+        XCTAssertEqual(luped.effectiveCapabilities, luped.requestedCapabilities)
+        XCTAssertTrue(luped.undeclaredRequestedCapabilities.isEmpty)
+    }
+
     func testSettingsChangesSaveState() {
         let manager = LupedSmartwatchManager(settings: LupedSettings(isEnabled: false))
         let delegate = MockSmartwatchManagerDelegate()
@@ -312,4 +324,17 @@ final class LupedSetupProgressTests: XCTestCase {
     func testADeliveredReadingStaysDoneAfterTheLinkDrops() {
         XCTAssertEqual(progress(.waitingForWatch, delivered: reading), .delivered(readingDate: reading))
     }
+}
+
+/// Declares only glucose but asks for more.
+private final class GreedySmartwatchManager: SmartwatchManager {
+    static var capabilities: SmartwatchCapabilities { [.glucose] }
+    var requestedCapabilities: SmartwatchCapabilities { [.glucose, .remoteBolus, .loopStatus] }
+    var pluginIdentifier: String { "Greedy" }
+    weak var smartwatchManagerDelegate: SmartwatchManagerDelegate?
+    var delegateQueue: DispatchQueue! = .main
+    init() {}
+    init?(rawState: RawStateValue) {}
+    var rawState: RawStateValue { [:] }
+    func watchDataDidUpdate(_ snapshot: SmartwatchStatusSnapshot) {}
 }

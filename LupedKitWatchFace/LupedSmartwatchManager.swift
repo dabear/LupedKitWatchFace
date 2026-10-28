@@ -203,7 +203,7 @@ public final class LupedSmartwatchManager: SmartwatchManager {
     @MainActor
     func requestAlertMute(_ duration: TimeInterval) {
         // Without `.remoteMute` the host never hears of it.
-        guard Self.capabilities.contains(.remoteMute) else {
+        guard effectiveCapabilities.contains(.remoteMute) else {
             logNote("Mute request from the watch ignored: remote mute is off for this watch", kind: .info)
             transport.sendResult("mute:ignored")
             return
@@ -233,7 +233,7 @@ public final class LupedSmartwatchManager: SmartwatchManager {
     @MainActor
     func requestBolus(_ units: Double, forced: Bool = false) {
         let action = forced ? "forcedbolus" : "bolus"
-        guard Self.capabilities.contains(.remoteBolus) else {
+        guard effectiveCapabilities.contains(.remoteBolus) else {
             logNote("Bolus request from the watch ignored: remote bolus is off for this watch", kind: .info)
             transport.sendResult("\(action):ignored")
             return
@@ -266,7 +266,7 @@ public final class LupedSmartwatchManager: SmartwatchManager {
     /// The host decides: permission and rate limit.
     @MainActor
     func requestCarbs(_ grams: Double) {
-        guard Self.capabilities.contains(.remoteCarbs) else {
+        guard effectiveCapabilities.contains(.remoteCarbs) else {
             logNote("Carb request from the watch ignored: remote carbs are off for this watch", kind: .info)
             transport.sendResult("carbs:ignored")
             return
