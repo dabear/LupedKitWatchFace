@@ -27,7 +27,9 @@ public final class LupedSmartwatchManager: SmartwatchManager {
     }
     public static let localizedTitle = LocalizedString("Pebble", comment: "Title of the Luped Pebble watch manager")
 
-    public static var capabilities: SmartwatchCapabilities { [.glucose, .history, .alerts] }
+    /// `.remoteMute` is declared for testing the watch's mute request; the host
+    /// still refuses it unless its user allowed muting from the watch.
+    public static var capabilities: SmartwatchCapabilities { [.glucose, .history, .alerts, .remoteMute] }
 
     public var pluginIdentifier: String { Self.pluginIdentifier }
     public var localizedTitle: String { Self.localizedTitle }
@@ -156,6 +158,9 @@ public final class LupedSmartwatchManager: SmartwatchManager {
             self.lockedDiagnostics.value = SavedDiagnostics(json: json, receivedAt: receivedAt)
             self.smartwatchManagerDelegate?.smartwatchManagerDidUpdateState(self)
         }
+        transport.alertMuteRequested = { [weak self] duration in
+            self?.requestAlertMute(duration)
+        }
         if let saved = savedDiagnostics {
             transport.restoreDiagnostics(json: saved.json, receivedAt: saved.receivedAt)
         }
@@ -165,6 +170,24 @@ public final class LupedSmartwatchManager: SmartwatchManager {
             logNote("\(Self.hostName) was built without the bluetooth-peripheral background mode: the watch only updates while \(Self.hostName) is in the foreground", kind: .error)
         }
         return transport
+    }
+
+    /// Passes the watch's mute request to the host and logs the outcome.
+    @MainActor
+    func requestAlertMute(_ duration: TimeInterval) {
+        guard let delegate = smartwatchManagerDelegate else {
+            logNote("Mute request not passed on: \(Self.hostName) isn't connected to this watch manager", kind: .error)
+            return
+        }
+        Task { @MainActor in
+            do {
+                let end = try await delegate.smartwatchManager(self, requestAlertMute: duration)
+                let time = DateFormatter.localizedString(from: end, dateStyle: .none, timeStyle: .short)
+                logNote("\(Self.hostName) alerts muted from the watch until \(time)", kind: .info)
+            } catch {
+                logNote("\(Self.hostName) refused the watch's mute request (\(error)); check Allow Mute from Watch in \(Self.hostName)'s alert settings", kind: .error)
+            }
+        }
     }
 
     /// Whether the app may keep the watch's Bluetooth service running in the background.
