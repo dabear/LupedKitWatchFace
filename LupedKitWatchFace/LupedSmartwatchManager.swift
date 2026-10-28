@@ -27,10 +27,11 @@ public final class LupedSmartwatchManager: SmartwatchManager {
     }
     public static let localizedTitle = LocalizedString("Pebble", comment: "Title of the Luped Pebble watch manager")
 
-    /// `.remoteMute`, `.remoteBolus` and `.remoteCarbs` are declared for testing the
-    /// watch's requests; the host still refuses them unless its user allowed
-    /// them (and, for boluses and carbs, the build enables them).
-    public static var capabilities: SmartwatchCapabilities { [.glucose, .history, .alerts, .remoteMute, .remoteBolus, .remoteCarbs] }
+    /// Remote actions (`.remoteMute`, `.remoteBolus`, `.remoteCarbs`) are not
+    /// declared: their request handling below is ready, but the watchface has to
+    /// react to `RESULT` and the requests need stronger security first. Without
+    /// them, a request from the watch is logged as ignored and never reaches the host.
+    public static var capabilities: SmartwatchCapabilities { [.glucose, .history, .alerts] }
 
     /// Every bolus the watch asks for is this size while remote bolus is being
     /// tested; the watch sends no amount.
