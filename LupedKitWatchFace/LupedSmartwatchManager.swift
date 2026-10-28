@@ -175,6 +175,11 @@ public final class LupedSmartwatchManager: SmartwatchManager {
     /// Passes the watch's mute request to the host and logs the outcome.
     @MainActor
     func requestAlertMute(_ duration: TimeInterval) {
+        // Without `.remoteMute` the host never hears of it.
+        guard Self.capabilities.contains(.remoteMute) else {
+            logNote("Mute request from the watch ignored: remote mute is off for this watch", kind: .info)
+            return
+        }
         guard let delegate = smartwatchManagerDelegate else {
             logNote("Mute request not passed on: \(Self.hostName) isn't connected to this watch manager", kind: .error)
             return
