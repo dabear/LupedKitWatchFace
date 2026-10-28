@@ -99,35 +99,52 @@ public final class LupedSmartwatchManager: SmartwatchManager {
     @MainActor var latestSnapshot: SmartwatchStatusSnapshot?
     @MainActor var transportIfStarted: LupedTransport?
 
-    /// Host-issued alerts currently showing, by identifier. The watch buzzes on
-    /// the highest level; the plugin does not evaluate thresholds itself.
+    /// Host-issued alerts currently showing, by identifier. The watch colours its
+    /// ring and buzzes from them; neither the plugin nor the watch has thresholds.
     @MainActor var activeAlerts: [SmartwatchAlertIdentifier: SmartwatchAlert] = [:]
 
     /// When this manager started tracking alerts. Alerts the host issued before
     /// then (for example before a relaunch) are only known once it issues them again.
     private let alertTrackingStarted = Date()
 
-    /// The level the watch sees (DATA index 8): 0 none, 1 info, 2 warning, 3 critical.
-    /// Zero while the user has turned watch alarms off, so the watch never buzzes.
-    /// Host alert mute is followed on the host side (muted alerts aren't forwarded).
-    @MainActor var hostAlertLevel: Int {
-        guard settings.alarmsEnabled else { return 0 }
-        return activeAlerts.values.map(\.level.watchLevel).max() ?? 0
+    /// The glucose alert states the watch knows (DATA index 8), most important first.
+    static let alertStatePriority = [2, 1, 3, 4]
+
+    /// The watch's alert state for a host alert: 1 low, 2 urgent low, 3 high,
+    /// 4 predicted low; `nil` for anything that isn't a glucose alert.
+    static func alertState(for identifier: SmartwatchAlertIdentifier) -> Int? {
+        let value = identifier.value
+        if value.hasSuffix("glucose.urgentLow") { return 2 }
+        if value.hasSuffix("glucose.low") { return 1 }
+        if value.hasSuffix("glucose.high") { return 3 }
+        if value.hasSuffix("glucose.predictedLow") { return 4 }
+        return nil
     }
 
-    /// Why `hostAlertLevel` is what it is, for the communication log.
+    /// What the watch sees (DATA index 8): the most important active glucose
+    /// alert (urgent low, low, high, predicted low), 0 when none. The watch colours
+    /// its ring from it: red for low and urgent low, amber for high, green
+    /// otherwise. Negative while the user's Watch Alarms switch is off: the ring
+    /// keeps its colour, but the watch only buzzes for a positive state. Host
+    /// alert mute is followed on the host side (muted alerts aren't forwarded).
+    @MainActor var hostAlertState: Int {
+        let active = Set(activeAlerts.keys.compactMap(Self.alertState(for:)))
+        guard let state = Self.alertStatePriority.first(where: active.contains) else { return 0 }
+        return settings.alarmsEnabled ? state : -state
+    }
+
+    /// Why `hostAlertState` is what it is, for the communication log.
     @MainActor var hostAlertReason: String {
-        guard settings.alarmsEnabled else {
-            return "Watch Alarms is turned off"
-        }
         guard !activeAlerts.isEmpty else {
             let since = DateFormatter.localizedString(from: alertTrackingStarted, dateStyle: .none, timeStyle: .short)
             return "no active alerts from \(Self.hostName) since \(since); muted alerts aren't sent"
         }
-        return activeAlerts.values
-            .sorted { $0.level.watchLevel > $1.level.watchLevel }
+        let priority = { (alert: SmartwatchAlert) in Self.alertState(for: alert.identifier).flatMap(Self.alertStatePriority.firstIndex(of:)) ?? Int.max }
+        let titles = activeAlerts.values
+            .sorted { priority($0) < priority($1) }
             .map { $0.title ?? $0.identifier.value }
             .joined(separator: ", ")
+        return settings.alarmsEnabled ? titles : titles + "; Watch Alarms is turned off, so the watch won't buzz"
     }
 
     public init(settings: LupedSettings = LupedSettings(isEnabled: true)) {
@@ -353,7 +370,7 @@ public final class LupedSmartwatchManager: SmartwatchManager {
             storedSampleCount: samples.count,
             unit: snapshot.displayUnit == .millimolesPerLiter ? .millimolesPerLiter : .milligramsPerDeciliter,
             // Thresholds don't travel to the watch; alerts are host-issued.
-            hostAlertLevel: hostAlertLevel,
+            hostAlertState: hostAlertState,
             hostAlertReason: hostAlertReason,
             alertEvent: alertEvent,
             // IOB, COB and the loop's age and mode for the watch's strip and loop ring.
@@ -423,17 +440,6 @@ extension LupedSmartwatchManager: DeviceManager {
     public func acknowledgeAlert(alertIdentifier: Alert.AlertIdentifier, completion: @escaping (Error?) -> Void) { completion(nil) }
     public func getSoundBaseURL() -> URL? { nil }
     public func getSounds() -> [Alert.Sound] { [] }
-}
-
-private extension SmartwatchAlertLevel {
-    /// Luped DATA index 8 value: 1 info, 2 warning, 3 critical.
-    var watchLevel: Int {
-        switch self {
-        case .informational: return 1
-        case .warning: return 2
-        case .critical: return 3
-        }
-    }
 }
 
 private extension LupedTrend {

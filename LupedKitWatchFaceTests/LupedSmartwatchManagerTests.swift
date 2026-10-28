@@ -161,7 +161,7 @@ final class LupedSmartwatchManagerTests: XCTestCase {
         XCTAssertEqual(snapshot.readings.map(\.milligramsPerDeciliter), [100, 110], "User-entered samples are not CGM readings")
         XCTAssertEqual(snapshot.readings.last?.trend, .singleUp)
         // Alerts are host-issued: no alert has fired yet.
-        XCTAssertEqual(snapshot.hostAlertLevel, 0)
+        XCTAssertEqual(snapshot.hostAlertState, 0)
         XCTAssertEqual(snapshot.alertEvent, 0)
     }
 
@@ -189,33 +189,45 @@ final class LupedSmartwatchManagerTests: XCTestCase {
         XCTAssertFalse(manager.watchHostDidReceiveURL(URL(string: "trio://smartwatch/callback")!))
     }
 
-    /// A host-issued alert raises the level the watch sees (DATA index 8), the
-    /// highest active alert wins, and retracting falls back; each is logged.
-    func testHostIssuedAlertSetsLevel() {
+    private func glucoseAlert(_ kind: String, _ level: SmartwatchAlertLevel = .warning, title: String? = nil) -> SmartwatchAlert {
+        SmartwatchAlert(identifier: SmartwatchAlertIdentifier("GlucoseAlertManager.glucose." + kind), level: level, title: title, body: nil, issuedAt: Date())
+    }
+
+    /// The watch's alert state (DATA index 8) is the most important active glucose
+    /// alert: urgent low, low, high, predicted low; retracting falls back.
+    func testHostIssuedAlertSetsState() {
         let manager = LupedSmartwatchManager(settings: LupedSettings(isEnabled: true))
         let delegate = MockSmartwatchManagerDelegate()
         manager.smartwatchManagerDelegate = delegate
-        XCTAssertEqual(manager.hostAlertLevel, 0)
+        XCTAssertEqual(manager.hostAlertState, 0)
 
-        manager.watchAlertDidIssue(SmartwatchAlert(identifier: SmartwatchAlertIdentifier("low"), level: .warning, title: "Low Glucose", body: nil, issuedAt: Date()))
-        XCTAssertEqual(manager.hostAlertLevel, 2, "Warning maps to level 2")
-        XCTAssertTrue(delegate.logEntries.contains { $0.type == .connection && $0.message.contains("Low Glucose") })
-
-        manager.watchAlertDidIssue(SmartwatchAlert(identifier: SmartwatchAlertIdentifier("pump"), level: .critical, title: "Pump", body: nil, issuedAt: Date()))
-        XCTAssertEqual(manager.hostAlertLevel, 3, "The highest active alert wins")
-        manager.watchAlertDidRetract(SmartwatchAlertIdentifier("pump"))
-        XCTAssertEqual(manager.hostAlertLevel, 2, "Falls back to the remaining alert")
-        manager.watchAlertDidRetract(SmartwatchAlertIdentifier("low"))
-        XCTAssertEqual(manager.hostAlertLevel, 0)
+        manager.watchAlertDidIssue(glucoseAlert("predictedLow"))
+        XCTAssertEqual(manager.hostAlertState, 4)
+        manager.watchAlertDidIssue(glucoseAlert("high", title: "High Glucose"))
+        XCTAssertEqual(manager.hostAlertState, 3, "High outranks predicted low")
+        XCTAssertTrue(delegate.logEntries.contains { $0.type == .connection && $0.message.contains("High Glucose") })
+        manager.watchAlertDidIssue(glucoseAlert("low"))
+        XCTAssertEqual(manager.hostAlertState, 1, "Low outranks high")
+        manager.watchAlertDidIssue(glucoseAlert("urgentLow", .critical))
+        XCTAssertEqual(manager.hostAlertState, 2, "Urgent low outranks everything")
+        manager.watchAlertDidRetract(SmartwatchAlertIdentifier("GlucoseAlertManager.glucose.urgentLow"))
+        XCTAssertEqual(manager.hostAlertState, 1)
+        manager.watchAlertDidIssue(SmartwatchAlert(identifier: SmartwatchAlertIdentifier("Pump.occlusion"), level: .critical, title: nil, body: nil, issuedAt: Date()))
+        XCTAssertEqual(manager.hostAlertState, 1, "Non-glucose alerts don't set a state")
+        for kind in ["low", "high", "predictedLow"] {
+            manager.watchAlertDidRetract(SmartwatchAlertIdentifier("GlucoseAlertManager.glucose." + kind))
+        }
+        XCTAssertEqual(manager.hostAlertState, 0)
     }
 
-    /// Turning watch alarms off keeps the level at 0 so the watch never buzzes,
-    /// whatever the host forwards.
-    func testWatchAlarmsOffSuppressesHostAlertLevel() {
+    /// With watch alarms off the state is negative: the ring keeps its colour, but
+    /// the watch only buzzes for a positive state.
+    func testWatchAlarmsOffNegatesTheState() {
         let manager = LupedSmartwatchManager(settings: LupedSettings(isEnabled: true, alarmsEnabled: false))
         manager.smartwatchManagerDelegate = MockSmartwatchManagerDelegate()
-        manager.watchAlertDidIssue(SmartwatchAlert(identifier: SmartwatchAlertIdentifier("low"), level: .critical, title: nil, body: nil, issuedAt: Date()))
-        XCTAssertEqual(manager.hostAlertLevel, 0)
+        manager.watchAlertDidIssue(glucoseAlert("low", .critical))
+        XCTAssertEqual(manager.hostAlertState, -1)
+        XCTAssertTrue(manager.hostAlertReason.hasSuffix("Watch Alarms is turned off, so the watch won't buzz"), manager.hostAlertReason)
     }
 
     /// A repeat of an active alert keeps the level but advances the alert event,
@@ -224,15 +236,15 @@ final class LupedSmartwatchManagerTests: XCTestCase {
         let manager = LupedSmartwatchManager(settings: LupedSettings(isEnabled: true))
         let delegate = MockSmartwatchManagerDelegate()
         manager.smartwatchManagerDelegate = delegate
-        let urgentLow = SmartwatchAlert(identifier: SmartwatchAlertIdentifier("glucose.urgentLow"), level: .critical, title: "Urgent Low", body: nil, issuedAt: Date())
+        let urgentLow = glucoseAlert("urgentLow", .critical, title: "Urgent Low")
 
         manager.watchAlertDidIssue(urgentLow)
         XCTAssertEqual(manager.alertEvent, 1)
-        XCTAssertEqual(manager.hostAlertLevel, 3)
+        XCTAssertEqual(manager.hostAlertState, 2)
 
         manager.watchAlertDidIssue(urgentLow)  // the host's repeat fire
         XCTAssertEqual(manager.alertEvent, 2)
-        XCTAssertEqual(manager.hostAlertLevel, 3, "A repeat doesn't change the level")
+        XCTAssertEqual(manager.hostAlertState, 2, "A repeat doesn't change the state")
         XCTAssertEqual(delegate.stateUpdates, 2, "Each fire saves the new event")
 
         let restored = try XCTUnwrap(LupedSmartwatchManager(rawState: manager.rawState))
@@ -244,9 +256,9 @@ final class LupedSmartwatchManagerTests: XCTestCase {
     func testAlertEventAdvancesWhileWatchAlarmsOff() {
         let manager = LupedSmartwatchManager(settings: LupedSettings(isEnabled: true, alarmsEnabled: false))
         manager.smartwatchManagerDelegate = MockSmartwatchManagerDelegate()
-        manager.watchAlertDidIssue(SmartwatchAlert(identifier: SmartwatchAlertIdentifier("glucose.low"), level: .warning, title: nil, body: nil, issuedAt: Date()))
+        manager.watchAlertDidIssue(glucoseAlert("low"))
         XCTAssertEqual(manager.alertEvent, 1)
-        XCTAssertEqual(manager.hostAlertLevel, 0)
+        XCTAssertEqual(manager.hostAlertState, -1)
     }
 
     /// The last watch diagnostics report is saved with the state, so the watch
