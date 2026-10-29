@@ -51,6 +51,12 @@ final class LupedSmartwatchManagerTests: XCTestCase {
         manager.settings.loopRing = false
         XCTAssertEqual(manager.requestedCapabilities, [.glucose, .history, .alerts, .loopStatus, .therapy], "a shown line keeps the loop ring")
         XCTAssertTrue(manager.requestedCapabilities.isSubset(of: LupedSmartwatchManager.capabilities))
+
+        manager.settings.fullScreen = true
+        XCTAssertEqual(manager.requestedCapabilities, [.glucose, .history, .alerts], "Large Glucose shows no status line or last loop")
+        XCTAssertEqual(delegate.refreshRequests, 3)
+        manager.settings.fullScreen = false
+        XCTAssertEqual(manager.requestedCapabilities, [.glucose, .history, .alerts, .loopStatus, .therapy], "the chosen line comes back")
     }
 
     // A plugin can't obtain a capability it didn't declare: hosts act only on

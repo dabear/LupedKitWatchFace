@@ -40,26 +40,27 @@ struct LupedWatchSettingsView: View {
             LupedLinkStatusSection(transport: transport, status: transport.status)
 
             Section {
-                Toggle(LocalizedString("Full-Screen Ring", comment: "Toggle showing the Pebble glucose ring full screen"), isOn: $model.settings.fullScreen)
+                Picker(LocalizedString("Layout", comment: "Picker choosing the Pebble watch layout"), selection: $model.settings.fullScreen) {
+                    Text(LocalizedString("Graph", comment: "Pebble layout choice: glucose ring with a trend graph, status line and last loop")).tag(false)
+                    Text(LocalizedString("Large Glucose", comment: "Pebble layout choice: a full-screen glucose ring only")).tag(true)
+                }
+                // Large Glucose shows neither; the choices are kept for Graph.
+                if !model.settings.fullScreen {
+                    Picker(LocalizedString("Status Line", comment: "Picker choosing what the Pebble status line shows"), selection: $model.settings.statusLine) {
+                        ForEach(LupedStatusLine.allCases, id: \.self) { choice in
+                            Text(choice.title).tag(choice)
+                        }
+                    }
+                    Toggle(LocalizedString("Last Loop", comment: "Toggle showing the minutes since the last loop on the Pebble"), isOn: Binding(
+                        get: { model.settings.showsLoopRing },
+                        set: { model.settings.loopRing = $0 }
+                    ))
+                    .disabled(model.settings.statusLine != .none)
+                }
             } header: {
                 Text(LocalizedString("Display", comment: "Header for the Pebble display settings"))
             } footer: {
-                Text(LocalizedString("Show a large glucose ring with the reading time inside it instead of the ring with a trend graph.", comment: "Footer for the Pebble full-screen ring toggle"))
-            }
-
-            Section {
-                Picker(LocalizedString("Status Line", comment: "Picker choosing what the Pebble status line shows"), selection: $model.settings.statusLine) {
-                    ForEach(LupedStatusLine.allCases, id: \.self) { choice in
-                        Text(choice.title).tag(choice)
-                    }
-                }
-                Toggle(LocalizedString("Loop Ring", comment: "Toggle showing the loop ring (minutes since the last loop) on the Pebble"), isOn: Binding(
-                    get: { model.settings.showsLoopRing },
-                    set: { model.settings.loopRing = $0 }
-                ))
-                .disabled(model.settings.statusLine != .none)
-            } footer: {
-                Text(model.settings.statusLineFooter)
+                Text(model.settings.displayFooter)
             }
 
             Section {
@@ -490,26 +491,28 @@ struct LupedLogDetailLine: View {
 }
 
 extension LupedSettings {
-    /// The footer under the Status Line picker and Loop Ring toggle: what the
-    /// watch shows and exactly what the app sends to it.
-    var statusLineFooter: String {
+    /// The footer under the Display settings: what the watch shows and exactly
+    /// what the app sends to it.
+    var displayFooter: String {
         let host = LupedSmartwatchManager.hostName
         let explanation: String
-        if statusLine != .none {
-            explanation = String(format: LocalizedString("Shown under the glucose ring, except with the full-screen ring. The line dims when %1$@ hasn't looped for 16 minutes, so the loop ring stays on.", comment: "Footer for the Pebble status line with a line chosen (1: app name)"), host)
+        if fullScreen {
+            explanation = LocalizedString("A large glucose ring with the reading time inside it, without graph, status line or last loop.", comment: "Footer for the Pebble Large Glucose layout")
+        } else if statusLine != .none {
+            explanation = String(format: LocalizedString("The status line shows under the glucose ring. It dims when %1$@ hasn't looped for 16 minutes, so Last Loop stays on.", comment: "Footer for the Pebble Graph layout with a status line chosen (1: app name)"), host)
         } else if loopRing {
-            explanation = String(format: LocalizedString("No line. The loop ring shows the minutes since %1$@ last looped.", comment: "Footer for the Pebble status line set to None with the loop ring on (1: app name)"), host)
+            explanation = String(format: LocalizedString("No status line. Last Loop shows the minutes since %1$@ last looped.", comment: "Footer for the Pebble Graph layout with status line None and Last Loop on (1: app name)"), host)
         } else {
-            explanation = String(format: LocalizedString("No line or loop ring; the watch doesn't show when %1$@ last looped.", comment: "Footer for the Pebble status line set to None with the loop ring off (1: app name)"), host)
+            explanation = String(format: LocalizedString("No status line or last loop; the watch doesn't show when %1$@ last looped.", comment: "Footer for the Pebble Graph layout with status line None and Last Loop off (1: app name)"), host)
         }
         var sent = [LocalizedString("glucose", comment: "Item in the Pebble 'sent to the watch' list"), LocalizedString("alerts", comment: "Item in the Pebble 'sent to the watch' list")]
-        if statusLine == .iobAndCob {
+        if shownStatusLine == .iobAndCob {
             sent.append(LocalizedString("IOB and COB", comment: "Item in the Pebble 'sent to the watch' list"))
         }
         if showsLoopRing {
             sent.append(LocalizedString("last loop and closed/open loop", comment: "Item in the Pebble 'sent to the watch' list"))
         }
-        switch statusLine {
+        switch shownStatusLine {
         case .tempBasal: sent.append(LocalizedString("temp basal", comment: "Item in the Pebble 'sent to the watch' list"))
         case .eventualGlucose: sent.append(LocalizedString("eventual glucose", comment: "Item in the Pebble 'sent to the watch' list"))
         case .sensitivityAndTarget: sent.append(LocalizedString("ISF and target", comment: "Item in the Pebble 'sent to the watch' list"))
@@ -517,7 +520,7 @@ extension LupedSettings {
         }
         let sentLine = String(format: LocalizedString("Sent to the watch: %@.", comment: "Pebble footer listing what the app sends to the watch (1: comma-separated list)"), sent.joined(separator: ", "))
         let battery: String
-        if statusLine == .iobAndCob {
+        if shownStatusLine == .iobAndCob {
             battery = String(format: LocalizedString("IOB changes again once %1$@'s dose is delivered, so while %1$@ is dosing the watch often gets two updates per reading. This uses more watch battery.", comment: "Pebble footer: battery note for the IOB & COB status line (1: app name)"), host)
         } else if showsLoopRing {
             battery = LocalizedString("The watch may get an occasional extra update between readings.", comment: "Pebble footer: battery note when loop status or therapy values are sent")
@@ -532,7 +535,7 @@ extension LupedStatusLine {
     /// The name shown in the Status Line picker.
     var title: String {
         switch self {
-        case .none: LocalizedString("None", comment: "Pebble status line choice: nothing on the status line and no loop ring")
+        case .none: LocalizedString("None", comment: "Pebble status line choice: nothing on the status line")
         case .iobAndCob: LocalizedString("IOB & COB", comment: "Pebble status line choice: insulin and carbs on board")
         case .tempBasal: LocalizedString("Temp Basal", comment: "Pebble status line choice: current temp or scheduled basal rate")
         case .eventualGlucose: LocalizedString("Eventual Glucose", comment: "Pebble status line choice: predicted eventual glucose")
