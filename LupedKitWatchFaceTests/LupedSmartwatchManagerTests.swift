@@ -312,15 +312,12 @@ private final class MockSmartwatchManagerDelegate: SmartwatchManagerDelegate {
     var logEntries: [SmartwatchDeviceLogEntry] = []
     var stateUpdates = 0
     var deletions = 0
-    var acknowledgedAlerts: [SmartwatchAlertIdentifier] = []
 
     func smartwatchManagerDidUpdateState(_ manager: SmartwatchManager) { stateUpdates += 1 }
     func smartwatchManagerWantsDeletion(_ manager: SmartwatchManager) async { deletions += 1 }
-    func smartwatchManager(_ manager: SmartwatchManager, glucoseSamplesSince start: Date) async throws -> [SmartwatchGlucoseReading] { [] }
     var refreshRequests = 0
     func smartwatchManagerRequestsRefresh(_ manager: SmartwatchManager) { refreshRequests += 1 }
     func smartwatchManager(_ manager: SmartwatchManager, didLogEvent event: SmartwatchDeviceLogEntry) { logEntries.append(event) }
-    func smartwatchManager(_ manager: SmartwatchManager, didAcknowledgeAlert identifier: SmartwatchAlertIdentifier) async { acknowledgedAlerts.append(identifier) }
     func smartwatchManager(_ manager: SmartwatchManager, requestBolus request: SmartwatchBolusRequest) async throws -> Double { throw SmartwatchBolusError.notAllowed }
 }
 
@@ -368,7 +365,6 @@ private final class GreedySmartwatchManager: SmartwatchManager {
     var requestedCapabilities: SmartwatchCapabilities { [.glucose, .remoteBolus, .loopStatus] }
     var pluginIdentifier: String { "Greedy" }
     weak var smartwatchManagerDelegate: SmartwatchManagerDelegate?
-    var delegateQueue: DispatchQueue! = .main
     init() {}
     init?(rawState: RawStateValue) {}
     var rawState: RawStateValue { [:] }

@@ -33,7 +33,6 @@ extension LupedSmartwatchManager: @retroactive SmartwatchManagerUI {
         LupedSettingsNavigationController(manager: self)
     }
 
-    public var watchStatusHighlight: DeviceStatusHighlight? { nil }
 }
 
 /// A drawn Pebble (steel case, black bezel, one left and three right

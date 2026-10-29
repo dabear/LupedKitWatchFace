@@ -53,12 +53,6 @@ public final class LupedSmartwatchManager: SmartwatchManager {
 
     public weak var smartwatchManagerDelegate: SmartwatchManagerDelegate?
 
-    public var delegateQueue: DispatchQueue! {
-        get { lockedDelegateQueue.value }
-        set { lockedDelegateQueue.value = newValue ?? .main }
-    }
-    private let lockedDelegateQueue = Locked<DispatchQueue>(.main)
-
     /// Luped's settings, saved in `rawState`. Changes apply to the watch link.
     public var settings: LupedSettings {
         get { lockedSettings.value }
