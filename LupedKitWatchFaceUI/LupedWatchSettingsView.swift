@@ -496,11 +496,11 @@ extension LupedSettings {
         let host = LupedSmartwatchManager.hostName
         let explanation: String
         if statusLine != .none {
-            explanation = String(format: LocalizedString("The black line under the glucose ring, next to the loop ring with the minutes since %1$@ last looped. The line dims when %1$@ hasn't looped for 16 minutes, which needs the loop's age, so the loop ring stays on while a line is shown. Not shown with the full-screen ring.", comment: "Footer for the Pebble status line with a line chosen (1: app name)"), host)
+            explanation = String(format: LocalizedString("Shown under the glucose ring, except with the full-screen ring. The line dims when %1$@ hasn't looped for 16 minutes, so the loop ring stays on.", comment: "Footer for the Pebble status line with a line chosen (1: app name)"), host)
         } else if loopRing {
-            explanation = String(format: LocalizedString("The line stays empty. The loop ring still shows the minutes since %1$@ last looped.", comment: "Footer for the Pebble status line set to None with the loop ring on (1: app name)"), host)
+            explanation = String(format: LocalizedString("No line. The loop ring shows the minutes since %1$@ last looped.", comment: "Footer for the Pebble status line set to None with the loop ring on (1: app name)"), host)
         } else {
-            explanation = String(format: LocalizedString("The line and the loop ring stay empty, and the watch doesn't show when %1$@ last looped.", comment: "Footer for the Pebble status line set to None with the loop ring off (1: app name)"), host)
+            explanation = String(format: LocalizedString("No line or loop ring; the watch doesn't show when %1$@ last looped.", comment: "Footer for the Pebble status line set to None with the loop ring off (1: app name)"), host)
         }
         var sent = [LocalizedString("glucose", comment: "Item in the Pebble 'sent to the watch' list"), LocalizedString("alerts", comment: "Item in the Pebble 'sent to the watch' list")]
         if statusLine == .iobAndCob {
@@ -518,9 +518,9 @@ extension LupedSettings {
         let sentLine = String(format: LocalizedString("Sent to the watch: %@.", comment: "Pebble footer listing what the app sends to the watch (1: comma-separated list)"), sent.joined(separator: ", "))
         let battery: String
         if statusLine == .iobAndCob {
-            battery = String(format: LocalizedString("IOB and COB change as %1$@ recalculates them, so the watch gets updates between readings, which can use more watch battery.", comment: "Pebble footer: battery note for the IOB & COB status line (1: app name)"), host)
+            battery = String(format: LocalizedString("IOB changes again once %1$@'s dose is delivered, so while %1$@ is dosing the watch often gets two updates per reading. This uses more watch battery.", comment: "Pebble footer: battery note for the IOB & COB status line (1: app name)"), host)
         } else if showsLoopRing {
-            battery = String(format: LocalizedString("These change each time %1$@ loops, so the watch can get an extra update between readings, which uses a little more watch battery.", comment: "Pebble footer: battery note when loop status or therapy values are sent (1: app name)"), host)
+            battery = LocalizedString("The watch may get an occasional extra update between readings.", comment: "Pebble footer: battery note when loop status or therapy values are sent")
         } else {
             battery = LocalizedString("Only new readings and alerts are sent, which uses the least watch battery.", comment: "Pebble footer: battery note when only glucose and alerts are sent")
         }
