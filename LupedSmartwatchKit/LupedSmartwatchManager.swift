@@ -269,6 +269,9 @@ public final class LupedSmartwatchManager: SmartwatchManager {
                 let units = try await delegate.smartwatchManager(self, requestBolus: request)
                 logNote(String(format: "%@ delivered %.2f U requested from the watch", Self.hostName, units), kind: .info)
                 transport.sendResult("\(action):ok")
+            } catch SmartwatchBolusError.inProgress {
+                // A repeat of the bolus being delivered: the first request's result follows.
+                logNote("\(Self.hostName) is still delivering this bolus; its result follows", kind: .info)
             } catch {
                 logNote("\(Self.hostName) refused the watch's bolus request (\(error))", kind: .error)
                 transport.sendResult("\(action):refused")
@@ -293,7 +296,8 @@ public final class LupedSmartwatchManager: SmartwatchManager {
         logNote(String(format: "Asking %@ to add %g g of carbs from the watch", Self.hostName, grams), kind: .info)
         Task { @MainActor in
             do {
-                let grams = try await delegate.smartwatchManager(self, requestCarbEntry: grams)
+                let request = SmartwatchCarbEntryRequest(grams: grams, requestedAt: Date())
+                let grams = try await delegate.smartwatchManager(self, requestCarbEntry: request)
                 logNote(String(format: "%@ added %g g of carbs requested from the watch", Self.hostName, grams), kind: .info)
                 transport.sendResult("carbs:ok")
             } catch {
