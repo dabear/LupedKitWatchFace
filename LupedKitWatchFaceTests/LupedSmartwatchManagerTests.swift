@@ -59,6 +59,9 @@ final class LupedSmartwatchManagerTests: XCTestCase {
         let greedy = GreedySmartwatchManager()
         XCTAssertEqual(greedy.effectiveCapabilities, [.glucose])
         XCTAssertEqual(greedy.undeclaredRequestedCapabilities, [.remoteBolus, .loopStatus])
+        XCTAssertEqual(greedy.undeclaredRequestedCapabilities.description, "loopStatus, remoteBolus", "hosts log the names")
+        XCTAssertEqual(SmartwatchCapabilities([]).description, "none")
+        XCTAssertEqual(SmartwatchCapabilities([.glucose, SmartwatchCapabilities(rawValue: 1 << 20)]).description, "glucose, raw value 1048576")
 
         let luped = LupedSmartwatchManager(settings: LupedSettings(isEnabled: false, statusLine: .eventualGlucose))
         XCTAssertEqual(luped.effectiveCapabilities, luped.requestedCapabilities)
