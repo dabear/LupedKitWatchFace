@@ -1,6 +1,6 @@
 //
 //  LupedSetupProgress.swift
-//  LupedKitWatchFace
+//  LupedSmartwatchKit
 //
 //  Copyright © 2026 LoopKit Authors. All rights reserved.
 //

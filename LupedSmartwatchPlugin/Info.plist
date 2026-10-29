@@ -19,7 +19,7 @@
 	<key>CFBundleVersion</key>
 	<string>1</string>
 	<key>NSPrincipalClass</key>
-	<string>LupedKitWatchFacePlugin</string>
+	<string>LupedSmartwatchPlugin</string>
 	<key>com.loopkit.Loop.SmartwatchManagerDisplayName</key>
 	<string>Pebble</string>
 	<key>com.loopkit.Loop.SmartwatchManagerIdentifier</key>

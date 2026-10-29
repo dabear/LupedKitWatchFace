@@ -15,9 +15,9 @@
             <BuildableReference
                BuildableIdentifier = "primary"
                BlueprintIdentifier = "9957C3874D28E7BE1F83FBD7"
-               BuildableName = "LupedKitWatchFacePlugin.loopplugin"
-               BlueprintName = "LupedKitWatchFacePlugin"
-               ReferencedContainer = "container:LupedKitWatchFace.xcodeproj">
+               BuildableName = "LupedSmartwatchPlugin.loopplugin"
+               BlueprintName = "LupedSmartwatchPlugin"
+               ReferencedContainer = "container:LupedSmartwatchKit.xcodeproj">
             </BuildableReference>
          </BuildActionEntry>
       </BuildActionEntries>
@@ -33,9 +33,9 @@
             <BuildableReference
                BuildableIdentifier = "primary"
                BlueprintIdentifier = "857CFAB25A1C956A84E76108"
-               BuildableName = "LupedKitWatchFaceTests.xctest"
-               BlueprintName = "LupedKitWatchFaceTests"
-               ReferencedContainer = "container:LupedKitWatchFace.xcodeproj">
+               BuildableName = "LupedSmartwatchKitTests.xctest"
+               BlueprintName = "LupedSmartwatchKitTests"
+               ReferencedContainer = "container:LupedSmartwatchKit.xcodeproj">
             </BuildableReference>
          </TestableReference>
       </Testables>

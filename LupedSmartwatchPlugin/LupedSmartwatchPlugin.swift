@@ -1,17 +1,17 @@
 //
-//  LupedKitWatchFacePlugin.swift
-//  LupedKitWatchFacePlugin
+//  LupedSmartwatchPlugin.swift
+//  LupedSmartwatchPlugin
 //
 //  Copyright © 2026 LoopKit Authors. All rights reserved.
 //
 
 import os.log
 import LoopKitUI
-import LupedKitWatchFace
-import LupedKitWatchFaceUI
+import LupedSmartwatchKit
+import LupedSmartwatchKitUI
 
-class LupedKitWatchFacePlugin: NSObject, SmartwatchManagerUIPlugin {
-    private let log = OSLog(subsystem: "org.loopkit.LupedKitWatchFace", category: "LupedKitWatchFacePlugin")
+class LupedSmartwatchPlugin: NSObject, SmartwatchManagerUIPlugin {
+    private let log = OSLog(subsystem: "org.loopkit.LupedSmartwatchKit", category: "LupedSmartwatchPlugin")
 
     public var smartwatchManagerType: SmartwatchManagerUI.Type? {
         return LupedSmartwatchManager.self

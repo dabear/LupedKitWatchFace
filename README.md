@@ -1,4 +1,4 @@
-# LupedKitWatchFace
+# LupedSmartwatchKit
 
 A Loop `SmartwatchManager` plugin that shows Loop's glucose on a Pebble running the
 [Luped CGM watchface](https://github.com/dabear/CrimsonBearPebbleWatchFace),
@@ -15,10 +15,10 @@ colours its ring from Loop's alerts.
 
 | Target | What it holds |
 |---|---|
-| `LupedKitWatchFace` | `LupedSmartwatchManager: SmartwatchManager`. Turns snapshots into LupedKit payloads, keeps Luped's settings in `rawState`, and forwards the watch communication log to Loop's device log. Re-exports `LupedKit`. |
-| `LupedKitWatchFaceUI` | `SmartwatchManagerUI` conformance and the Settings → Devices → Pebble screens: status, display (layout, status line, last loop), alarms, diagnostics, communication log, watchface UUID. |
-| `LupedKitWatchFacePlugin` | The `.loopplugin` principal class and Info.plist keys (`com.loopkit.Loop.SmartwatchManagerIdentifier`). |
-| `LupedKitWatchFaceTests` | Unit tests, including the device-log mapping. |
+| `LupedSmartwatchKit` | `LupedSmartwatchManager: SmartwatchManager`. Turns snapshots into LupedKit payloads, keeps Luped's settings in `rawState`, and forwards the watch communication log to Loop's device log. Re-exports `LupedKit`. |
+| `LupedSmartwatchKitUI` | `SmartwatchManagerUI` conformance and the Settings → Devices → Pebble screens: status, display (layout, status line, last loop), alarms, diagnostics, communication log, watchface UUID. |
+| `LupedSmartwatchPlugin` | The `.loopplugin` principal class and Info.plist keys (`com.loopkit.Loop.SmartwatchManagerIdentifier`). |
+| `LupedSmartwatchKitTests` | Unit tests, including the device-log mapping. |
 
 Capabilities: `.glucose`, `.history`, `.alerts`, `.loopStatus`, `.therapy`. The
 plugin requests only what its Display settings need (`requestedCapabilities`).
@@ -53,7 +53,7 @@ xed LoopWorkspace.xcworkspace
 Build the `LoopWorkspace` scheme. To run the plugin's tests:
 
 ```sh
-xcodebuild test -workspace LoopWorkspace.xcworkspace -scheme LupedKitWatchFace \
+xcodebuild test -workspace LoopWorkspace.xcworkspace -scheme LupedSmartwatchKit \
   -destination 'platform=iOS Simulator,name=iPhone 18 Pro'
 ```
 

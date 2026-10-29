@@ -1,13 +1,13 @@
 //
 //  LupedSmartwatchManagerTests.swift
-//  LupedKitWatchFaceTests
+//  LupedSmartwatchKitTests
 //
 //  Copyright © 2026 LoopKit Authors. All rights reserved.
 //
 
 import XCTest
 import LoopKit
-@testable import LupedKitWatchFace
+@testable import LupedSmartwatchKit
 
 @MainActor
 final class LupedSmartwatchManagerTests: XCTestCase {

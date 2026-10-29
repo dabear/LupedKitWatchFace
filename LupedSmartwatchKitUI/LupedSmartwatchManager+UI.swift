@@ -1,13 +1,13 @@
 //
 //  LupedSmartwatchManager+UI.swift
-//  LupedKitWatchFaceUI
+//  LupedSmartwatchKitUI
 //
 //  Copyright © 2026 LoopKit Authors. All rights reserved.
 //
 
 import LoopKit
 import LoopKitUI
-import LupedKitWatchFace
+import LupedSmartwatchKit
 import SwiftUI
 import UIKit
 

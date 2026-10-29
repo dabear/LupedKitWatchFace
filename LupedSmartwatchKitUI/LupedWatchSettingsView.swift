@@ -1,12 +1,12 @@
 //
 //  LupedWatchSettingsView.swift
-//  LupedKitWatchFaceUI
+//  LupedSmartwatchKitUI
 //
 //  Copyright © 2026 LoopKit Authors. All rights reserved.
 //
 
 import LoopKitUI
-import LupedKitWatchFace
+import LupedSmartwatchKit
 import SwiftUI
 
 /// Publishes the manager's settings to SwiftUI and saves edits back to it.
