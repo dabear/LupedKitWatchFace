@@ -148,7 +148,7 @@ public final class LupedSmartwatchManager: SmartwatchManager {
             .sorted { priority($0) < priority($1) }
             .map { $0.title ?? $0.identifier.value }
             .joined(separator: ", ")
-        return settings.alarmsEnabled ? titles : titles + "; Watch Alarms is turned off, so the watch won't buzz"
+        return titles
     }
 
     public init(settings: LupedSettings = LupedSettings(isEnabled: true)) {
@@ -310,8 +310,8 @@ public final class LupedSmartwatchManager: SmartwatchManager {
     }
 
     /// Whether the app may keep the watch's Bluetooth service running in the background.
-    public static func hasBluetoothPeripheralBackgroundMode(in bundle: Bundle = .main) -> Bool {
-        (bundle.object(forInfoDictionaryKey: "UIBackgroundModes") as? [String])?.contains("bluetooth-peripheral") == true
+    public static func hasBluetoothPeripheralBackgroundMode() -> Bool {
+        (Bundle.main.object(forInfoDictionaryKey: "UIBackgroundModes") as? [String])?.contains("bluetooth-peripheral") == true
     }
 
     @MainActor
@@ -326,15 +326,15 @@ public final class LupedSmartwatchManager: SmartwatchManager {
         // Every fire (first or repeat) is a new event for the watch to buzz on.
         lockedAlertEvent.value = (lockedAlertEvent.value + 1) % Self.alertEventModulus
         smartwatchManagerDelegate?.smartwatchManagerDidUpdateState(self)
-        logNote("Host alert issued [\(alert.level)], event \(alertEvent): \(alert.title ?? "") \(alert.body ?? "")", kind: .info)
+        logNote("\(Self.hostName) alert issued [\(alert.level)], event \(alertEvent): \(alert.title ?? "") \(alert.body ?? "")", kind: .info)
         // Resend the snapshot so the watch sees the new alert level/event and buzzes.
         Task { await transport.refresh() }
     }
 
     @MainActor
     public func watchAlertDidRetract(_ identifier: SmartwatchAlertIdentifier) {
-        guard activeAlerts.removeValue(forKey: identifier) != nil else { return }
-        logNote("Host alert retracted: \(identifier.value)", kind: .info)
+        guard let alert = activeAlerts.removeValue(forKey: identifier) else { return }
+        logNote("\(Self.hostName) alert retracted: \(alert.title ?? identifier.value)", kind: .info)
         Task { await transport.refresh() }
     }
 
@@ -373,7 +373,6 @@ public final class LupedSmartwatchManager: SmartwatchManager {
             readings: readings,
             storedSampleCount: samples.count,
             unit: snapshot.displayUnit == .millimolesPerLiter ? .millimolesPerLiter : .milligramsPerDeciliter,
-            // Thresholds don't travel to the watch; alerts are host-issued.
             hostAlertState: hostAlertState,
             hostAlertReason: hostAlertReason,
             alertEvent: alertEvent,
@@ -426,7 +425,9 @@ extension LupedSmartwatchManager {
             "* enabled: \(settings.isEnabled)",
             "* watchfaceUUID: \(settings.watchfaceUUID.uuidString.lowercased())",
             "* alarmsEnabled: \(settings.alarmsEnabled)",
-            "* fullScreen: \(settings.fullScreen)",
+            "* layout: \(settings.fullScreen ? "Large Glucose" : "Graph")",
+            "* statusLine: \(settings.statusLine.displayName)",
+            "* lastLoop: \(settings.loopRing)",
         ].joined(separator: "\n")
     }
 }

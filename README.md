@@ -5,28 +5,28 @@ A Loop `SmartwatchManager` plugin that shows Loop's glucose on a Pebble running 
 over [elbbepTransport](https://github.com/dabear/elbbepTransport)'s direct
 Bluetooth link (no PebbleKit JS, no phone-side Pebble SDK).
 
-It is the first plugin for the `SmartwatchManager` plugin type proposed for
-[LoopKit/Loop#2568](https://github.com/LoopKit/Loop/pull/2568). Loop sends the
-plugin a `SmartwatchStatusSnapshot` as soon as a new glucose reading is stored,
-before the loop runs, and the plugin pushes it to the watch right away. The
-watch alarms on its own, so the plugin also receives Loop's glucose alert
-settings and alert mute.
+It is the first plugin for the `SmartwatchManager` plugin type. Loop sends the
+plugin a `SmartwatchStatusSnapshot` as soon as a new glucose reading is stored
+and again after the loop runs, and forwards its glucose alerts; the plugin
+pushes both to the watch. The watch has no thresholds of its own: it buzzes and
+colours its ring from Loop's alerts.
 
 ## Targets
 
 | Target | What it holds |
 |---|---|
 | `LupedKitWatchFace` | `LupedSmartwatchManager: SmartwatchManager`. Turns snapshots into LupedKit payloads, keeps Luped's settings in `rawState`, and forwards the watch communication log to Loop's device log. Re-exports `LupedKit`. |
-| `LupedKitWatchFaceUI` | `SmartwatchManagerUI` conformance and the Settings → Devices → Pebble screens: status, display, alarms, diagnostics, communication log, watchface UUID. |
+| `LupedKitWatchFaceUI` | `SmartwatchManagerUI` conformance and the Settings → Devices → Pebble screens: status, display (layout, status line, last loop), alarms, diagnostics, communication log, watchface UUID. |
 | `LupedKitWatchFacePlugin` | The `.loopplugin` principal class and Info.plist keys (`com.loopkit.Loop.SmartwatchManagerIdentifier`). |
 | `LupedKitWatchFaceTests` | Unit tests, including the device-log mapping. |
 
-Capabilities: `.glucose`, `.history`, `.alerts`.
+Capabilities: `.glucose`, `.history`, `.alerts`, `.loopStatus`, `.therapy`. The
+plugin requests only what its Display settings need (`requestedCapabilities`).
 
 ## Device log
 
 Every line LupedKit writes to its communication log also goes to
-`DeviceManagerDelegate.deviceManager(_:logEventForDeviceIdentifier:type:message:completion:)`,
+`SmartwatchManagerDelegate.smartwatchManager(_:didLogEvent:)`,
 keyed by the watchface UUID, so it appears in Loop's issue report and critical
 event log export:
 

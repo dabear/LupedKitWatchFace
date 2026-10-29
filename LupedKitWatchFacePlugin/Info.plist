@@ -21,7 +21,7 @@
 	<key>NSPrincipalClass</key>
 	<string>LupedKitWatchFacePlugin</string>
 	<key>com.loopkit.Loop.SmartwatchManagerDisplayName</key>
-	<string>Pebble (Luped CGM watchface)</string>
+	<string>Pebble</string>
 	<key>com.loopkit.Loop.SmartwatchManagerIdentifier</key>
 	<string>LupedSmartwatchManager</string>
 	<key>com.loopkit.Loop.DeviceManufacturer</key>

@@ -13,16 +13,13 @@ import SwiftUI
 @MainActor
 final class LupedSettingsModel: ObservableObject {
     let manager: LupedSmartwatchManager
-    /// The host's debug builds show test tools, such as sending a test RESULT.
-    let allowDebugFeatures: Bool
 
     @Published var settings: LupedSettings {
         didSet { manager.settings = settings }
     }
 
-    init(manager: LupedSmartwatchManager, allowDebugFeatures: Bool = false) {
+    init(manager: LupedSmartwatchManager) {
         self.manager = manager
-        self.allowDebugFeatures = allowDebugFeatures
         settings = manager.settings
     }
 }
@@ -72,7 +69,7 @@ struct LupedWatchSettingsView: View {
             }
 
             Section {
-                NavigationLink(destination: LupedDiagnosticsView(transport: transport, allowDebugFeatures: model.allowDebugFeatures)) {
+                NavigationLink(destination: LupedDiagnosticsView(transport: transport)) {
                     Text(LocalizedString("Diagnostics", comment: "Row opening Pebble diagnostics"))
                 }
                 NavigationLink(destination: LupedAdvancedSettingsView(model: model)) {
@@ -87,8 +84,6 @@ struct LupedWatchSettingsView: View {
                     Text(LocalizedString("Delete Pebble", comment: "Button removing the Pebble smartwatch"))
                         .foregroundColor(.red)
                 }
-            } footer: {
-                Text(String(format: LocalizedString("%@ sends glucose readings and its glucose alerts to a Pebble watchface over Bluetooth while the watch is paired with the Pebble app.", comment: "Footer explaining the Pebble smartwatch device (1: app name)"), LupedSmartwatchManager.hostName))
             }
         }
         .insetGroupedListStyle()
@@ -113,14 +108,6 @@ struct LupedWatchSettingsView: View {
 /// Watch info and the communication log, for troubleshooting.
 struct LupedDiagnosticsView: View {
     let transport: LupedTransport
-    var allowDebugFeatures = false
-
-    /// Test tools for watch requests (Send Test Result). Off by default; set to
-    /// true to show them, and only in the host's debug builds.
-    static let showsTestTools = false
-
-    /// Sample replies for testing how the watchface shows a request's outcome.
-    private static let testResults = ["bolus:ok", "bolus:refused", "forcedbolus:ok", "carbs:ok", "carbs:failed", "mute:ok", "mute:ignored"]
 
     var body: some View {
         List {
@@ -132,20 +119,6 @@ struct LupedDiagnosticsView: View {
                 }
             } footer: {
                 Text(String(format: LocalizedString("Everything %1$@ sends to and receives from the watch since %1$@ started, newest first. The same lines are kept in %1$@'s device log for issue reports.", comment: "Footer for the Pebble log section (1: app name)"), LupedSmartwatchManager.hostName))
-            }
-
-            if Self.showsTestTools && allowDebugFeatures {
-                Section {
-                    Menu(LocalizedString("Send Test Result", comment: "Debug menu sending a sample RESULT to the Pebble watch")) {
-                        ForEach(Self.testResults, id: \.self) { result in
-                            Button(result) { transport.sendResult(result) }
-                        }
-                    }
-                } header: {
-                    Text(LocalizedString("Debug", comment: "Header for the Pebble debug tools"))
-                } footer: {
-                    Text(LocalizedString("Sends a sample outcome of a watch request (RESULT) so you can see how the watchface shows it. Nothing is requested or delivered.", comment: "Footer for the Pebble test result menu"))
-                }
             }
         }
         .insetGroupedListStyle()
@@ -181,7 +154,7 @@ struct LupedAdvancedSettingsView: View {
                         .disabled(draftUUID == nil)
                 }
                 if model.settings.watchfaceUUID != LupedSettings.defaultWatchfaceUUID {
-                    Button(LocalizedString("Use Luped CGM", comment: "Button restoring the default Pebble watchface UUID")) {
+                    Button(LocalizedString("Use Luped CGM Watchface", comment: "Button restoring the default Pebble watchface UUID")) {
                         draft = defaultUUID
                         save()
                     }
@@ -234,10 +207,10 @@ struct LupedLinkStatusSection: View {
         case .connecting: return LocalizedString("Connecting", comment: "Pebble link status: session handshake in progress")
         case .open:
             if status.paused {
-                return LocalizedString("Connected · paused, watchface not running", comment: "Pebble link status: sending paused after repeated rejections")
+                return LocalizedString("Connected · Luped CGM not open, sending paused", comment: "Pebble link status: sending paused after repeated rejections")
             }
             return watchfaceRejected
-                ? LocalizedString("Connected · watchface not running", comment: "Pebble link status: connected but the watch rejected the reading")
+                ? LocalizedString("Connected · Luped CGM not open", comment: "Pebble link status: connected but the watch rejected the reading")
                 : LocalizedString("Connected", comment: "Pebble link status: session open")
         }
     }
@@ -310,6 +283,8 @@ struct LupedLinkStatusSection: View {
             }
         } header: {
             Text(LocalizedString("Status", comment: "Header for the Pebble link status section"))
+        } footer: {
+            Text(String(format: LocalizedString("%@ sends glucose readings and its glucose alerts to the Luped CGM watchface over Bluetooth while the watch is paired with the Pebble app.", comment: "Footer explaining the Pebble smartwatch device (1: app name)"), LupedSmartwatchManager.hostName))
         }
     }
 }
@@ -325,12 +300,12 @@ struct LupedWatchInfoSection: View {
                 row(LocalizedString("Battery", comment: "Pebble watch info: battery"), info.battery.map { "\($0)%" })
                 row(LocalizedString("Readings received", comment: "Pebble watch info: DATA messages received"), info.readingsReceived.map(String.init))
                 row(LocalizedString("Refresh requests", comment: "Pebble watch info: refresh requests sent"), info.refreshRequests.map(String.init))
-                row(LocalizedString("Stale data events", comment: "Pebble watch info: stale transitions"), info.staleTransitions.map(String.init))
+                row(LocalizedString("Times data went stale", comment: "Pebble watch info: stale transitions"), info.staleTransitions.map(String.init))
                 row(LocalizedString("Phone disconnects", comment: "Pebble watch info: disconnects and total time"), disconnects(info))
                 row(LocalizedString("Counting since", comment: "Pebble watch info: diagnostics window start"), info.countingSince.map { DateFormatter.localizedString(from: $0, dateStyle: .short, timeStyle: .short) })
                 row(LocalizedString("Updated", comment: "Pebble watch info: time the snapshot arrived"), updatedText(info.receivedAt))
             } else {
-                Text(LocalizedString("The watch sends its battery and counters about once an hour.", comment: "Shown before the Pebble watch has sent its first diagnostics report"))
+                Text(LocalizedString("No watch info yet.", comment: "Shown before the Pebble watch has sent its first diagnostics report"))
                     .foregroundColor(.secondary)
             }
             if let note = status.watchInfoNote {
@@ -345,7 +320,7 @@ struct LupedWatchInfoSection: View {
         } header: {
             Text(LocalizedString("Watch", comment: "Header for the Pebble watch info section"))
         } footer: {
-            Text(String(format: LocalizedString("The watchface reports this about once an hour. Refresh Watch Info asks now; right after %@ reconnects, the reply can take up to half a minute. Counters cover at most the last 48 hours.", comment: "Footer for the Pebble watch info section (1: app name)"), LupedSmartwatchManager.hostName))
+            Text(LocalizedString("The watch reports this about once an hour, covering at most the last 48 hours. Refresh Watch Info asks now; the reply can take up to 30 seconds.", comment: "Footer for the Pebble watch info section"))
         }
     }
 
@@ -499,7 +474,7 @@ extension LupedSettings {
         if fullScreen {
             explanation = LocalizedString("A large glucose ring with the reading time inside it, without graph, status line or last loop.", comment: "Footer for the Pebble Large Glucose layout")
         } else if statusLine != .none {
-            explanation = String(format: LocalizedString("The status line shows under the glucose ring. It dims when %1$@ hasn't looped for 16 minutes, so Last Loop stays on.", comment: "Footer for the Pebble Graph layout with a status line chosen (1: app name)"), host)
+            explanation = String(format: LocalizedString("The status line shows under the glucose ring and dims when %1$@ hasn't looped for 16 minutes. Last Loop is always shown with a status line.", comment: "Footer for the Pebble Graph layout with a status line chosen (1: app name)"), host)
         } else if loopRing {
             explanation = String(format: LocalizedString("No status line. Last Loop shows the minutes since %1$@ last looped.", comment: "Footer for the Pebble Graph layout with status line None and Last Loop on (1: app name)"), host)
         } else {
@@ -510,7 +485,7 @@ extension LupedSettings {
             sent.append(LocalizedString("IOB and COB", comment: "Item in the Pebble 'sent to the watch' list"))
         }
         if showsLoopRing {
-            sent.append(LocalizedString("last loop and closed/open loop", comment: "Item in the Pebble 'sent to the watch' list"))
+            sent.append(LocalizedString("last loop", comment: "Item in the Pebble 'sent to the watch' list"))
         }
         switch shownStatusLine {
         case .tempBasal: sent.append(LocalizedString("temp basal", comment: "Item in the Pebble 'sent to the watch' list"))
@@ -521,7 +496,7 @@ extension LupedSettings {
         let sentLine = String(format: LocalizedString("Sent to the watch: %@.", comment: "Pebble footer listing what the app sends to the watch (1: comma-separated list)"), sent.joined(separator: ", "))
         let battery: String
         if shownStatusLine == .iobAndCob {
-            battery = String(format: LocalizedString("IOB changes again once %1$@'s dose is delivered, so while %1$@ is dosing the watch often gets two updates per reading. This uses more watch battery.", comment: "Pebble footer: battery note for the IOB & COB status line (1: app name)"), host)
+            battery = String(format: LocalizedString("Uses more watch battery: while %1$@ is dosing, IOB changes again after each dose, so the watch often gets two updates per reading.", comment: "Pebble footer: battery note for the IOB & COB status line (1: app name)"), host)
         } else if showsLoopRing {
             battery = LocalizedString("The watch may get an occasional extra update between readings.", comment: "Pebble footer: battery note when loop status or therapy values are sent")
         } else {

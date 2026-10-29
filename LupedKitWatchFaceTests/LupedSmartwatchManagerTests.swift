@@ -107,7 +107,7 @@ final class LupedSmartwatchManagerTests: XCTestCase {
         let entry = try XCTUnwrap(delegate.logEntries.first)
         XCTAssertEqual(entry.deviceIdentifier, uuid.uuidString.lowercased())
         XCTAssertEqual(entry.type, .connection)
-        XCTAssertEqual(entry.message, "Watch alarms disabled")
+        XCTAssertEqual(entry.message, "Watch Alarms off: the watch won't buzz")
 
         delegate.logEntries.removeAll()
         manager.logDeviceCommunication("to", kind: .toWatch)
@@ -128,7 +128,7 @@ final class LupedSmartwatchManagerTests: XCTestCase {
         delegate.logEntries.removeAll()
 
         manager.watchAlertDidIssue(SmartwatchAlert(identifier: SmartwatchAlertIdentifier("glucose.high"), level: .warning, title: "High Glucose", issuedAt: Date()))
-        XCTAssertTrue(log.entries.last?.message.hasPrefix("Host alert issued [warning], event 1: High Glucose") == true, log.text)
+        XCTAssertTrue(log.entries.last?.message.hasPrefix("\(LupedSmartwatchManager.hostName) alert issued [warning], event 1: High Glucose") == true, log.text)
         XCTAssertEqual(delegate.logEntries.count, 1)
 
         manager.watchHostDidLog("Next alert: from 11:25 if glucose stays above 10.0 mmol/L")
@@ -248,7 +248,7 @@ final class LupedSmartwatchManagerTests: XCTestCase {
         manager.smartwatchManagerDelegate = MockSmartwatchManagerDelegate()
         manager.watchAlertDidIssue(glucoseAlert("low", .critical))
         XCTAssertEqual(manager.hostAlertState, -1)
-        XCTAssertTrue(manager.hostAlertReason.hasSuffix("Watch Alarms is turned off, so the watch won't buzz"), manager.hostAlertReason)
+        XCTAssertFalse(manager.hostAlertReason.contains("Watch Alarms"), "the DATA decode already says Watch Alarms is off: \(manager.hostAlertReason)")
     }
 
     /// A repeat of an active alert keeps the level but advances the alert event,

@@ -81,7 +81,7 @@ struct LupedSetupIntroView: View {
                             .scaledToFit()
                             .frame(height: 110)
                             .accessibilityHidden(true)
-                        Text(String(format: LocalizedString("%1$@ sends each new glucose reading to your Pebble as soon as it arrives, and the watch vibrates when %1$@ raises a glucose alert.", comment: "Pebble setup introduction (1: app name)"), LupedSmartwatchManager.hostName))
+                        Text(String(format: LocalizedString("%1$@ sends each new glucose reading to your Pebble as soon as it arrives, and the watch buzzes when %1$@ raises a glucose alert.", comment: "Pebble setup introduction (1: app name)"), LupedSmartwatchManager.hostName))
                             .multilineTextAlignment(.center)
                     }
                     .frame(maxWidth: .infinity)
@@ -105,9 +105,9 @@ struct LupedSetupIntroView: View {
                     EmptyView()
                 } footer: {
                     VStack(alignment: .leading, spacing: 8) {
-                        Text(String(format: LocalizedString("The watch buzzes when %@ raises a glucose alert. You can turn the watch alarms off on their own later.", comment: "Pebble setup note about watch alarms (1: app name)"), LupedSmartwatchManager.hostName))
+                        Text(String(format: LocalizedString("You can turn Watch Alarms off later in the Pebble settings; %@'s own alerts are unaffected.", comment: "Pebble setup note about watch alarms (1: app name)"), LupedSmartwatchManager.hostName))
                         if !LupedSmartwatchManager.hasBluetoothPeripheralBackgroundMode() {
-                            Text(String(format: LocalizedString("This build of %1$@ updates the watch only while %1$@ is open. Build it with the bluetooth-peripheral background mode to update the watch in the background.", comment: "Pebble setup warning when the app lacks the bluetooth-peripheral background mode (1: app name)"), LupedSmartwatchManager.hostName))
+                            Text(String(format: LocalizedString("This build of %1$@ can only update the watch while %1$@ is open.", comment: "Pebble setup warning when the app lacks the bluetooth-peripheral background mode (1: app name)"), LupedSmartwatchManager.hostName))
                                 .foregroundColor(.orange)
                         }
                     }
@@ -190,7 +190,7 @@ struct LupedSetupProgressView: View {
                 }
 
                 Section {
-                    LupedStepRow(done: true, text: String(format: LocalizedString("%@ is ready for the watch", comment: "Pebble setup step: Bluetooth service published (1: app name)"), LupedSmartwatchManager.hostName))
+                    LupedStepRow(done: progress != .bluetoothUnavailable, text: String(format: LocalizedString("%@ is ready for the watch", comment: "Pebble setup step: Bluetooth service published (1: app name)"), LupedSmartwatchManager.hostName))
                     LupedStepRow(done: watchConnected, text: LocalizedString("Watch connected", comment: "Pebble setup step: watch connected"))
                     LupedStepRow(done: progress.isComplete, text: LocalizedString("Reading shown on the watch", comment: "Pebble setup step: reading delivered"))
                 }
