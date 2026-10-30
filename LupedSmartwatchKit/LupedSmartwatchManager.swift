@@ -193,14 +193,14 @@ public final class LupedSmartwatchManager: SmartwatchManager {
             self.lockedDiagnostics.value = SavedDiagnostics(json: json, receivedAt: receivedAt)
             self.smartwatchManagerDelegate?.smartwatchManagerDidUpdateState(self)
         }
-        transport.alertMuteRequested = { [weak self] duration in
-            self?.requestAlertMute(duration)
+        transport.alertMuteRequested = { [weak self] duration, requestedAt in
+            self?.requestAlertMute(duration, requestedAt: requestedAt)
         }
-        transport.bolusRequested = { [weak self] units, forced in
-            self?.requestBolus(units, forced: forced)
+        transport.bolusRequested = { [weak self] units, forced, requestedAt in
+            self?.requestBolus(units, forced: forced, requestedAt: requestedAt)
         }
-        transport.carbsRequested = { [weak self] grams in
-            self?.requestCarbs(grams)
+        transport.carbsRequested = { [weak self] grams, requestedAt in
+            self?.requestCarbs(grams, requestedAt: requestedAt)
         }
         if let saved = savedDiagnostics {
             transport.restoreDiagnostics(json: saved.json, receivedAt: saved.receivedAt)
@@ -215,11 +215,16 @@ public final class LupedSmartwatchManager: SmartwatchManager {
 
     /// Passes the watch's mute request to the host and logs the outcome.
     @MainActor
-    func requestAlertMute(_ duration: TimeInterval) {
+    func requestAlertMute(_ duration: TimeInterval, requestedAt: Date?) {
         // Without `.remoteMute` the host never hears of it.
         guard effectiveCapabilities.contains(.remoteMute) else {
             logNote("Mute request from the watch ignored: remote mute is off for this watch", kind: .info)
             transport.sendResult("mute:ignored")
+            return
+        }
+        guard let requestedAt else {
+            logNote("Mute request refused: the watch didn't say when it was confirmed (COMMAND without @<confirmedAt>)", kind: .error)
+            transport.sendResult("mute:refused")
             return
         }
         guard let delegate = smartwatchManagerDelegate else {
@@ -229,7 +234,8 @@ public final class LupedSmartwatchManager: SmartwatchManager {
         }
         Task { @MainActor in
             do {
-                let end = try await delegate.smartwatchManager(self, requestAlertMute: duration)
+                let request = SmartwatchAlertMuteRequest(duration: duration, requestedAt: requestedAt)
+                let end = try await delegate.smartwatchManager(self, requestAlertMute: request)
                 let time = DateFormatter.localizedString(from: end, dateStyle: .none, timeStyle: .short)
                 logNote("\(Self.hostName) alerts muted from the watch until \(time)", kind: .info)
                 transport.sendResult("mute:ok")
@@ -245,11 +251,18 @@ public final class LupedSmartwatchManager: SmartwatchManager {
     /// request and context age, maximum bolus, recommendation (skipped when
     /// `forced`) and rate limits.
     @MainActor
-    func requestBolus(_ units: Double, forced: Bool = false) {
+    func requestBolus(_ units: Double, forced: Bool = false, requestedAt: Date?) {
         let action = forced ? "forcedbolus" : "bolus"
         guard effectiveCapabilities.contains(.remoteBolus) else {
             logNote("Bolus request from the watch ignored: remote bolus is off for this watch", kind: .info)
             transport.sendResult("\(action):ignored")
+            return
+        }
+        // Only the watch knows when the user confirmed; the time the command
+        // reached the phone could be long after.
+        guard let requestedAt else {
+            logNote("Bolus request refused: the watch didn't say when it was confirmed (COMMAND without @<confirmedAt>)", kind: .error)
+            transport.sendResult("\(action):refused")
             return
         }
         guard let delegate = smartwatchManagerDelegate else {
@@ -262,7 +275,7 @@ public final class LupedSmartwatchManager: SmartwatchManager {
             transport.sendResult("\(action):failed")
             return
         }
-        let request = SmartwatchBolusRequest(units: units, contextToken: context.token, requestedAt: Date(), isForced: forced)
+        let request = SmartwatchBolusRequest(units: units, contextToken: context.token, requestedAt: requestedAt, isForced: forced)
         logNote(String(format: "Asking %@ for a %.2f U %@from the watch", Self.hostName, request.units, forced ? "forced bolus (recommendation not checked) " : "bolus "), kind: .info)
         Task { @MainActor in
             do {
@@ -282,10 +295,15 @@ public final class LupedSmartwatchManager: SmartwatchManager {
     /// Asks the host to add the carb entry the watch chose, and logs the outcome.
     /// The host decides: permission and rate limit.
     @MainActor
-    func requestCarbs(_ grams: Double) {
+    func requestCarbs(_ grams: Double, requestedAt: Date?) {
         guard effectiveCapabilities.contains(.remoteCarbs) else {
             logNote("Carb request from the watch ignored: remote carbs are off for this watch", kind: .info)
             transport.sendResult("carbs:ignored")
+            return
+        }
+        guard let requestedAt else {
+            logNote("Carb request refused: the watch didn't say when it was confirmed (COMMAND without @<confirmedAt>)", kind: .error)
+            transport.sendResult("carbs:refused")
             return
         }
         guard let delegate = smartwatchManagerDelegate else {
@@ -296,7 +314,7 @@ public final class LupedSmartwatchManager: SmartwatchManager {
         logNote(String(format: "Asking %@ to add %g g of carbs from the watch", Self.hostName, grams), kind: .info)
         Task { @MainActor in
             do {
-                let request = SmartwatchCarbEntryRequest(grams: grams, requestedAt: Date())
+                let request = SmartwatchCarbEntryRequest(grams: grams, requestedAt: requestedAt)
                 let grams = try await delegate.smartwatchManager(self, requestCarbEntry: request)
                 logNote(String(format: "%@ added %g g of carbs requested from the watch", Self.hostName, grams), kind: .info)
                 transport.sendResult("carbs:ok")
