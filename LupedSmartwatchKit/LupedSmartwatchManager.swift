@@ -62,6 +62,7 @@ public final class LupedSmartwatchManager: SmartwatchManager {
             lockedSettings.value = newValue
             Task { @MainActor in
                 self.transportIfStarted?.settings = newValue
+                self.transportIfStarted?.issuesBolusKey = self.effectiveCapabilities.contains(.remoteBolus)
             }
             smartwatchManagerDelegate?.smartwatchManagerDidUpdateState(self)
             // The host fills only what is requested; ask it for a snapshot with the new set.
@@ -92,7 +93,11 @@ public final class LupedSmartwatchManager: SmartwatchManager {
     var savedDiagnostics: SavedDiagnostics? { lockedDiagnostics.value }
     private let lockedDiagnostics: Locked<SavedDiagnostics?>
 
-    @MainActor var latestSnapshot: SmartwatchStatusSnapshot?
+    @MainActor var latestSnapshot: SmartwatchStatusSnapshot? {
+        didSet { snapshotCount += 1 }
+    }
+    /// Snapshots received, so a request can wait for the next one.
+    @MainActor private var snapshotCount = 0
     @MainActor var transportIfStarted: LupedTransport?
 
     /// Host-issued alerts currently showing, by identifier. The watch colours its
@@ -196,9 +201,11 @@ public final class LupedSmartwatchManager: SmartwatchManager {
         transport.alertMuteRequested = { [weak self] duration, requestedAt in
             self?.requestAlertMute(duration, requestedAt: requestedAt)
         }
-        transport.bolusRequested = { [weak self] units, forced, requestedAt in
-            self?.requestBolus(units, forced: forced, requestedAt: requestedAt)
+        transport.bolusRequested = { [weak self] units, forced, grams, requestedAt in
+            self?.requestBolus(units, forced: forced, grams: grams, requestedAt: requestedAt)
         }
+        // A session key only while the host may take boluses from this watch.
+        transport.issuesBolusKey = effectiveCapabilities.contains(.remoteBolus)
         transport.carbsRequested = { [weak self] grams, requestedAt in
             self?.requestCarbs(grams, requestedAt: requestedAt)
         }
@@ -246,50 +253,93 @@ public final class LupedSmartwatchManager: SmartwatchManager {
         }
     }
 
-    /// Asks the host for the bolus the watch chose, against the bolus context it
-    /// last sent, and logs the outcome. The host's policy decides: permission,
-    /// request and context age, maximum bolus, recommendation (skipped when
-    /// `forced`) and rate limits.
+    /// The longest wait for the host's snapshot after adding a request's carbs.
+    static let carbsSnapshotTimeout: TimeInterval = 15
+
+    /// Asks the host for a signed bolus the watch chose (LupedKit has checked the
+    /// signature, timing and resends), and logs the outcome. With carbs, like
+    /// Loop's and Trio's Apple Watch apps: the carbs are added first, then the
+    /// bolus is checked against the host's next bolus context, whose
+    /// recommendation includes them; without the carbs there is no bolus. The
+    /// host's policy decides: permission, request and context age, maximum
+    /// bolus, recommendation (skipped when `forced`) and rate limits.
     @MainActor
-    func requestBolus(_ units: Double, forced: Bool = false, requestedAt: Date?) {
-        let action = forced ? "forcedbolus" : "bolus"
+    func requestBolus(_ units: Double, forced: Bool = false, grams: Double? = nil, requestedAt: Date) {
+        let action = forced ? "signedforcedbolus" : "signedbolus"
+        // Answers the request: its carbs first if it had any, then the bolus.
+        let answer = { [transport] (carbs: String?, bolus: String) in
+            if grams != nil, let carbs {
+                transport.sendResult("carbs:\(carbs)")
+            }
+            transport.sendResult("\(action):\(bolus)")
+        }
         guard effectiveCapabilities.contains(.remoteBolus) else {
             logNote("Bolus request from the watch ignored: remote bolus is off for this watch", kind: .info)
-            transport.sendResult("\(action):ignored")
+            answer("ignored", "ignored")
             return
         }
-        // Only the watch knows when the user confirmed; the time the command
-        // reached the phone could be long after.
-        guard let requestedAt else {
-            logNote("Bolus request refused: the watch didn't say when it was confirmed (COMMAND without @<confirmedAt>)", kind: .error)
-            transport.sendResult("\(action):refused")
+        if grams != nil, !effectiveCapabilities.contains(.remoteCarbs) {
+            logNote("Bolus request with carbs refused: remote carbs are off for this watch, and the bolus isn't given without its carbs", kind: .error)
+            answer("ignored", "refused")
             return
         }
         guard let delegate = smartwatchManagerDelegate else {
             logNote("Bolus request not passed on: \(Self.hostName) isn't connected to this watch manager", kind: .error)
-            transport.sendResult("\(action):failed")
+            answer("failed", "failed")
             return
         }
-        guard let context = latestSnapshot?.bolusContext else {
-            logNote("Bolus request not passed on: \(Self.hostName) hasn't sent a bolus context yet (Allow Boluses from Watch may be off)", kind: .error)
-            transport.sendResult("\(action):failed")
-            return
-        }
-        let request = SmartwatchBolusRequest(units: units, contextToken: context.token, requestedAt: requestedAt, isForced: forced)
-        logNote(String(format: "Asking %@ for a %.2f U %@from the watch", Self.hostName, request.units, forced ? "forced bolus (recommendation not checked) " : "bolus "), kind: .info)
         Task { @MainActor in
+            if let grams {
+                logNote(String(format: "Asking %@ to add %g g of carbs from the watch before the bolus", Self.hostName, grams), kind: .info)
+                do {
+                    let added = try await delegate.smartwatchManager(self, requestCarbEntry: SmartwatchCarbEntryRequest(grams: grams, requestedAt: requestedAt))
+                    logNote(String(format: "%@ added %g g of carbs requested from the watch", Self.hostName, added), kind: .info)
+                    transport.sendResult("carbs:ok")
+                } catch {
+                    logNote("\(Self.hostName) refused the watch's carbs (\(error)), so the bolus isn't given either", kind: .error)
+                    answer("refused", "refused")
+                    return
+                }
+            }
+            // With carbs, the context sent before them recommends too little: wait
+            // for the host's next one, which counts them.
+            let snapshot = grams == nil ? latestSnapshot : await nextSnapshot(timeout: Self.carbsSnapshotTimeout)
+            guard let context = snapshot?.bolusContext else {
+                logNote("Bolus request not passed on: \(Self.hostName) hasn't sent a bolus context\(grams == nil ? " yet (Allow Boluses from Watch may be off)" : String(format: " within %.0f s of adding the carbs", Self.carbsSnapshotTimeout))", kind: .error)
+                transport.sendResult("\(action):failed")
+                return
+            }
+            let request = SmartwatchBolusRequest(units: units, contextToken: context.token, requestedAt: requestedAt, isForced: forced)
+            logNote(String(format: "Asking %@ for a %.2f U %@from the watch", Self.hostName, request.units, forced ? "forced bolus (recommendation not checked) " : "bolus "), kind: .info)
             do {
                 let units = try await delegate.smartwatchManager(self, requestBolus: request)
                 logNote(String(format: "%@ delivered %.2f U requested from the watch", Self.hostName, units), kind: .info)
                 transport.sendResult("\(action):ok")
             } catch SmartwatchBolusError.inProgress {
-                // A repeat of the bolus being delivered: the first request's result follows.
-                logNote("\(Self.hostName) is still delivering this bolus; its result follows", kind: .info)
+                // LupedKit passes each signed request on once, so this is another
+                // request for the bolus being delivered: that one's result follows.
+                logNote("\(Self.hostName) is still delivering a bolus for this context; this request is refused", kind: .error)
+                transport.sendResult("\(action):refused")
             } catch {
                 logNote("\(Self.hostName) refused the watch's bolus request (\(error))", kind: .error)
                 transport.sendResult("\(action):refused")
             }
         }
+    }
+
+    /// Asks the host for a snapshot and waits for it; `nil` after `timeout`.
+    @MainActor
+    private func nextSnapshot(timeout: TimeInterval) async -> SmartwatchStatusSnapshot? {
+        let start = snapshotCount
+        smartwatchManagerDelegate?.smartwatchManagerRequestsRefresh(self)
+        let deadline = Date().addingTimeInterval(timeout)
+        while Date() < deadline {
+            try? await Task.sleep(nanoseconds: 200_000_000)
+            if snapshotCount != start {
+                return latestSnapshot
+            }
+        }
+        return nil
     }
 
     /// Asks the host to add the carb entry the watch chose, and logs the outcome.
