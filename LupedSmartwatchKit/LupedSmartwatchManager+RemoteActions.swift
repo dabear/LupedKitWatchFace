@@ -9,7 +9,7 @@ import Foundation
 import LoopKit
 import LupedKit
 
-/// Requests from the watch (mute, carbs, signed boluses, presets), passed to the host only
+/// Requests from the watch (mute, carbs, signed boluses, override and temp target presets), passed to the host only
 /// with their capability; the host decides. Each request is answered on `RESULT`.
 extension LupedSmartwatchManager {
     /// Passes the watch's mute request to the host and logs the outcome.
@@ -174,24 +174,47 @@ extension LupedSmartwatchManager {
         }
     }
 
-    /// Asks the host to start the preset the watch named (by id, or by name
-    /// ignoring case, from the host's latest presets) or to end the running one,
-    /// and logs the outcome. The host decides: permission and request age.
+    /// Asks the host to start the override preset the watch named (by id, or by
+    /// name ignoring case, from the host's latest presets) or to end the running
+    /// one, and logs the outcome. The host decides: permission and request age.
     @MainActor
-    func requestOverride(_ action: LupedOverrideAction, requestedAt: Date?) {
-        guard effectiveCapabilities.contains(.remoteOverride) else {
-            logNote("Preset request from the watch ignored: \(capabilityMismatch(.remoteOverride, named: "remoteOverride"))", kind: .error)
-            transport.sendResult("override:ignored")
+    func requestOverride(_ action: LupedPresetAction, requestedAt: Date?) {
+        requestPreset(action, requestedAt: requestedAt, kind: .override)
+    }
+
+    /// The same for temp target presets, on hosts that have them.
+    @MainActor
+    func requestTempTarget(_ action: LupedPresetAction, requestedAt: Date?) {
+        requestPreset(action, requestedAt: requestedAt, kind: .tempTarget)
+    }
+
+    enum PresetKind {
+        case override, tempTarget
+
+        var capability: SmartwatchCapabilities { self == .override ? .remoteOverride : .remoteTempTarget }
+        var capabilityName: String { self == .override ? "remoteOverride" : "remoteTempTarget" }
+        /// The `<action>` of its `RESULT`.
+        var action: String { self == .override ? "override" : "temptarget" }
+        var noun: String { self == .override ? "preset" : "temp target" }
+        var permission: String { self == .override ? "Allow Presets from Watch" : "Allow Temp Targets from Watch" }
+    }
+
+    @MainActor
+    private func requestPreset(_ action: LupedPresetAction, requestedAt: Date?, kind: PresetKind) {
+        let request = kind.noun.prefix(1).uppercased() + kind.noun.dropFirst() + " request"
+        guard effectiveCapabilities.contains(kind.capability) else {
+            logNote("\(request) from the watch ignored: \(capabilityMismatch(kind.capability, named: kind.capabilityName))", kind: .error)
+            transport.sendResult("\(kind.action):ignored")
             return
         }
         guard let requestedAt else {
-            logNote("Preset request refused: the watch didn't say when it was confirmed (COMMAND without @<confirmedAt>)", kind: .error)
-            transport.sendResult("override:refused")
+            logNote("\(request) refused: the watch didn't say when it was confirmed (COMMAND without @<confirmedAt>)", kind: .error)
+            transport.sendResult("\(kind.action):refused")
             return
         }
         guard let delegate = smartwatchManagerDelegate else {
-            logNote("Preset request not passed on: \(Self.hostName) isn't connected to this watch manager", kind: .error)
-            transport.sendResult("override:failed")
+            logNote("\(request) not passed on: \(Self.hostName) isn't connected to this watch manager", kind: .error)
+            transport.sendResult("\(kind.action):failed")
             return
         }
         let presetAction: SmartwatchPresetAction
@@ -199,26 +222,30 @@ extension LupedSmartwatchManager {
         case .cancel:
             presetAction = .cancel
         case .start(let wanted):
-            let presets = latestSnapshot?.overridePresets ?? []
+            let presets = (kind == .override ? latestSnapshot?.overridePresets : latestSnapshot?.tempTargetPresets) ?? []
             guard let preset = presets.first(where: { $0.id == wanted })
                 ?? presets.first(where: { $0.name.caseInsensitiveCompare(wanted) == .orderedSame })
             else {
                 let known = presets.isEmpty ? "it hasn't sent any" : presets.map { "\"\($0.name)\"" }.joined(separator: ", ")
-                logNote("Preset request refused: \(Self.hostName) has no preset \"\(wanted)\" (\(known))", kind: .error)
-                transport.sendResult("override:refused")
+                logNote("\(request) refused: \(Self.hostName) has no \(kind.noun) \"\(wanted)\" (\(known))", kind: .error)
+                transport.sendResult("\(kind.action):refused")
                 return
             }
             presetAction = .activate(presetID: preset.id)
         }
         Task { @MainActor in
             do {
-                let request = SmartwatchOverrideRequest(action: presetAction, requestedAt: requestedAt)
-                try await delegate.smartwatchManager(self, requestOverride: request)
-                logNote("\(Self.hostName) \(action == .cancel ? "ended the running preset" : "started the preset") requested from the watch", kind: .info)
-                transport.sendResult("override:ok")
+                switch kind {
+                case .override:
+                    try await delegate.smartwatchManager(self, requestOverride: SmartwatchOverrideRequest(action: presetAction, requestedAt: requestedAt))
+                case .tempTarget:
+                    try await delegate.smartwatchManager(self, requestTempTarget: SmartwatchTempTargetRequest(action: presetAction, requestedAt: requestedAt))
+                }
+                logNote("\(Self.hostName) \(action == .cancel ? "ended the running" : "started the") \(kind.noun) requested from the watch", kind: .info)
+                transport.sendResult("\(kind.action):ok")
             } catch {
-                logNote("\(Self.hostName) refused the watch's preset request (\(error)); check Allow Presets from Watch in \(Self.hostName)'s settings", kind: .error)
-                transport.sendResult("override:refused")
+                logNote("\(Self.hostName) refused the watch's \(kind.noun) request (\(error)); check \(kind.permission) in \(Self.hostName)'s settings", kind: .error)
+                transport.sendResult("\(kind.action):refused")
             }
         }
     }
