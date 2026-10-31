@@ -27,21 +27,23 @@ public final class LupedSmartwatchManager: SmartwatchManager {
     }
     public static let localizedTitle = LocalizedString("Pebble", comment: "Title of the Luped Pebble watch manager")
 
-    /// Remote actions (`.remoteMute`, `.remoteBolus`, `.remoteCarbs`) are not
-    /// declared: their request handling below is ready, but the watchface has to
-    /// react to `RESULT` and the requests need stronger security first. Without
-    /// them, a request from the watch is logged as ignored and never reaches the host.
+    /// Of the remote actions only `.remoteOverride` is declared: a preset the
+    /// user set up in the host, behind the host's own Watch Permissions toggle.
+    /// Mute, carbs and boluses (`.remoteMute`, `.remoteCarbs`, `.remoteBolus`)
+    /// are not: their request handling below is ready, but they need stronger
+    /// security first. Without them, a request from the watch is logged as
+    /// ignored and never reaches the host.
     /// `.loopStatus` feeds the watch's IOB/COB strip and loop ring; `.therapy`
     /// the other status line choices (temp basal, eventual glucose, ISF & target).
-    public static var capabilities: SmartwatchCapabilities { [.glucose, .history, .alerts, .loopStatus, .therapy] }
+    public static var capabilities: SmartwatchCapabilities { [.glucose, .history, .alerts, .loopStatus, .therapy, .remoteOverride] }
 
     /// Only what the watch shows: loop status while the loop ring shows (every
     /// shown line, and None with Last Loop on), therapy values for the lines the
     /// phone formats from them; with the Large Glucose layout neither. History is
-    /// always requested: the delta and trend come from it. The host fills nothing
-    /// else.
+    /// always requested: the delta and trend come from it, and presets, which the
+    /// watch's preset requests are matched against. The host fills nothing else.
     public var requestedCapabilities: SmartwatchCapabilities {
-        var requested: SmartwatchCapabilities = [.glucose, .history, .alerts]
+        var requested: SmartwatchCapabilities = [.glucose, .history, .alerts, .remoteOverride]
         if settings.needsLoopStatus { requested.insert(.loopStatus) }
         if settings.needsTherapy { requested.insert(.therapy) }
         return requested
@@ -208,6 +210,9 @@ public final class LupedSmartwatchManager: SmartwatchManager {
         transport.issuesBolusKey = effectiveCapabilities.contains(.remoteBolus)
         transport.carbsRequested = { [weak self] grams, requestedAt in
             self?.requestCarbs(grams, requestedAt: requestedAt)
+        }
+        transport.overrideRequested = { [weak self] action, requestedAt in
+            self?.requestOverride(action, requestedAt: requestedAt)
         }
         if let saved = savedDiagnostics {
             transport.restoreDiagnostics(json: saved.json, receivedAt: saved.receivedAt)
