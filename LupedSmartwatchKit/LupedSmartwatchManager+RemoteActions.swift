@@ -17,7 +17,7 @@ extension LupedSmartwatchManager {
     func requestAlertMute(_ duration: TimeInterval, requestedAt: Date?) {
         // Without `.remoteMute` the host never hears of it.
         guard effectiveCapabilities.contains(.remoteMute) else {
-            logNote("Mute request from the watch ignored: remote mute is off for this watch", kind: .info)
+            logNote("Mute request from the watch ignored: \(capabilityMismatch(.remoteMute, named: "remoteMute"))", kind: .error)
             transport.sendResult("mute:ignored")
             return
         }
@@ -45,6 +45,13 @@ extension LupedSmartwatchManager {
         }
     }
 
+    /// Why a request needing `capability` isn't passed to the host.
+    func capabilityMismatch(_ capability: SmartwatchCapabilities, named name: String) -> String {
+        Self.capabilities.contains(capability)
+            ? "this plugin has the \(name) capability but doesn't request it now"
+            : "this plugin doesn't have the \(name) capability"
+    }
+
     /// The longest wait for the host's snapshot after adding a request's carbs.
     static let carbsSnapshotTimeout: TimeInterval = 15
 
@@ -66,12 +73,12 @@ extension LupedSmartwatchManager {
             transport.sendResult("\(action):\(bolus)")
         }
         guard effectiveCapabilities.contains(.remoteBolus) else {
-            logNote("Bolus request from the watch ignored: remote bolus is off for this watch", kind: .info)
+            logNote("Bolus request from the watch ignored: \(capabilityMismatch(.remoteBolus, named: "remoteBolus"))", kind: .error)
             answer("ignored", "ignored")
             return
         }
         if grams != nil, !effectiveCapabilities.contains(.remoteCarbs) {
-            logNote("Bolus request with carbs refused: remote carbs are off for this watch, and the bolus isn't given without its carbs", kind: .error)
+            logNote("Bolus request with carbs refused: \(capabilityMismatch(.remoteCarbs, named: "remoteCarbs")), and the bolus isn't given without its carbs", kind: .error)
             answer("ignored", "refused")
             return
         }
@@ -139,7 +146,7 @@ extension LupedSmartwatchManager {
     @MainActor
     func requestCarbs(_ grams: Double, requestedAt: Date?) {
         guard effectiveCapabilities.contains(.remoteCarbs) else {
-            logNote("Carb request from the watch ignored: remote carbs are off for this watch", kind: .info)
+            logNote("Carb request from the watch ignored: \(capabilityMismatch(.remoteCarbs, named: "remoteCarbs"))", kind: .error)
             transport.sendResult("carbs:ignored")
             return
         }
